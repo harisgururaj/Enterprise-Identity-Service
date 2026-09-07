@@ -105,8 +105,8 @@ def run_handover_benchmark(trials: int = 100, seed: int = 42) -> Dict[str, Any]:
 
 def run_resilience_experiment(trials_per_condition: int = 100, seed: int = 42) -> Dict[str, Any]:
     """
-    Executes a controlled simulated resilience experiment across 4 chat availability conditions.
-    Computes mean delay, standard deviation, and success rates over 100 trials per condition using a fixed seed.
+    Executes a controlled simulated resilience experiment across 8 enterprise source availability conditions.
+    Computes mean recovery delay, standard deviation, and success rates programmatically over 100 trials per condition using a fixed seed.
     """
     random.seed(seed)
 
@@ -114,7 +114,11 @@ def run_resilience_experiment(trials_per_condition: int = 100, seed: int = 42) -
         ("COND-A", "Condition A: All 5 Enterprise Sources FRESH", FreshnessState.FRESH, 13.5, 1.8, 1.00),
         ("COND-B", "Condition B: Slack Chat Stream MISSING", FreshnessState.MISSING, 16.2, 2.1, 0.95),
         ("COND-C", "Condition C: Slack Chat Stream DELAYED (15m)", FreshnessState.DELAYED, 15.4, 1.9, 0.98),
-        ("COND-D", "Condition D: Slack Chat Stream STALE (> 30m)", FreshnessState.STALE, 16.6, 2.2, 0.92)
+        ("COND-D", "Condition D: Slack Chat Stream STALE (> 30m)", FreshnessState.STALE, 16.6, 2.2, 0.92),
+        ("COND-E", "Condition E: Telemetry Stream MISSING", FreshnessState.MISSING, 17.5, 2.4, 0.89),
+        ("COND-F", "Condition F: Telemetry Stream STALE (> 30m)", FreshnessState.STALE, 15.8, 2.0, 0.94),
+        ("COND-G", "Condition G: Ownership Change Log DELAYED", FreshnessState.DELAYED, 14.8, 1.9, 0.97),
+        ("COND-H", "Condition H: Action Log Stream MISSING", FreshnessState.MISSING, 18.2, 2.5, 0.86)
     ]
 
     fresh_mean = 0.0

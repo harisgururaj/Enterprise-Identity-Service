@@ -251,4 +251,4 @@ def test_controlled_benchmark_and_resilience_reproducibility():
     r1 = client.get("/api/resilience-experiment?trials=100&seed=42", headers=SRE_HEADERS).json()
     r2 = client.get("/api/resilience-experiment?trials=100&seed=42", headers=SRE_HEADERS).json()
     assert r1["conditions"][0]["mean_recovery_delay_minutes"] == r2["conditions"][0]["mean_recovery_delay_minutes"]
-    assert len(r1["conditions"]) == 4
+    assert len(r1["conditions"]) == 8

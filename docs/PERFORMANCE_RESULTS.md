@@ -19,9 +19,9 @@ The benchmark engine executes a controlled simulated evaluation comparing the **
 
 ---
 
-## 2. Controlled Resilience Experiment Results
+## 2. Controlled Resilience Experiment Results (8 Availability Conditions)
 
-Evaluates recovery context loss delay and task completion rate across 4 chat stream availability conditions ($N=100$ trials per condition, `seed=42`).
+Evaluates recovery context loss delay and task completion rate across 8 enterprise source availability conditions ($N=100$ trials per condition, `seed=42`).
 
 | Condition ID | Condition Name | Chat Freshness State | Mean Recovery Delay | Std Dev | Task Success Rate | Delay Degradation vs Fresh | Operational Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -29,7 +29,11 @@ Evaluates recovery context loss delay and task completion rate across 4 chat str
 | **COND-B** | Slack Chat Stream | `MISSING` | **16.35 min** | 2.20 min | **92.0%** | +2.62 min | `OPERATIONAL (Resilient Fallback)` |
 | **COND-C** | Slack Chat Stream | `DELAYED (15m)` | **15.94 min** | 2.12 min | **97.0%** | +2.21 min | `OPERATIONAL (Resilient Fallback)` |
 | **COND-D** | Slack Chat Stream | `STALE (>30m)` | **16.35 min** | 2.32 min | **95.0%** | +2.62 min | `OPERATIONAL (Resilient Fallback)` |
+| **COND-E** | Telemetry Stream | `MISSING` | **17.51 min** | 2.38 min | **89.0%** | +3.78 min | `OPERATIONAL (Resilient Fallback)` |
+| **COND-F** | Telemetry Stream | `STALE (>30m)` | **15.82 min** | 1.98 min | **94.0%** | +2.09 min | `OPERATIONAL (Resilient Fallback)` |
+| **COND-G** | Ownership Log | `DELAYED` | **14.78 min** | 1.88 min | **97.0%** | +1.05 min | `OPERATIONAL (Resilient Fallback)` |
+| **COND-H** | Action Log Stream | `MISSING` | **18.15 min** | 2.48 min | **86.0%** | +4.42 min | `OPERATIONAL (Resilient Fallback)` |
 
 ### Resilience Key Findings
 1. **Single-Source Outage Resilience**: Under complete loss of the chat stream (`MISSING`), task success remains high (**92.0%**) due to graph synthesis from the remaining 4 enterprise sources.
-2. **Degradation Ceiling**: Loss or lag of the chat stream increases recovery delay by a maximum of **+2.62 minutes**, remaining significantly superior to the unstructured baseline delay (**42.23 minutes**).
+2. **Degradation Ceiling**: Across all outage conditions, recovery delay increases by a maximum of **+4.42 minutes**, remaining significantly superior to the unstructured baseline delay (**42.23 minutes**).
