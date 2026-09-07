@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Identity Service - Resilient Shift Handover Workspace</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+      <div class="brand-section">
+        <div class="brand-logo">ID</div>
+        <div>
+          <div class="brand-title">AUTH-CORE :: Internal Identity Service</div>
+          <div class="brand-subtitle">Resilient Shift-Handover Workspace (Enterprise Scale)</div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="incident-badge">
+          <span class="pulse-dot"></span>
+          <span>INCIDENT INC-9042 (SEV-1)</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="role-selector-container">
+          <span class="role-label">VIEW ROLE:</span>
+          <select id="role-select" class="role-select" onchange="switchRole(this.value)">
+            <option value="SRE / On-Call Specialist">SRE / On-Call Specialist</option>
+            <option value="Incident Commander / Handover Lead">Incident Commander / Handover Lead</option>
+            <option value="Enterprise App Developer / Stakeholder">Enterprise App Developer / Stakeholder</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary" onclick="resetScenario()">Reset Scenario</button>
+      </div>
+    </header>
+
+    <!-- Freshness Status Bar -->
+    <div class="freshness-bar">
+      <div class="freshness-item">
+        <span>Incident Notes:</span>
+        <span id="fresh-notes" class="freshness-badge badge-fresh">FRESH</span>
+      </div>
+      <div class="freshness-item">
+        <span>Slack Chat Feed:</span>
+        <span id="fresh-chat" class="freshness-badge badge-fresh">FRESH</span>
+      </div>
+      <div class="freshness-item">
+        <span>Telemetry Dashboards:</span>
+        <span id="fresh-metrics" class="freshness-badge badge-fresh">FRESH</span>
+      </div>
+      <div class="freshness-item">
+        <span>Ownership Rotation:</span>
+        <span id="fresh-ownership" class="freshness-badge badge-fresh">FRESH</span>
+      </div>
+      <div class="freshness-item">
+        <span>Action & Audit Logs:</span>
+        <span id="fresh-actions" class="freshness-badge badge-fresh">FRESH</span>
+      </div>
+    </div>
+
+    <!-- Handover Header Banner -->
+    <div class="handover-banner">
+      <div class="banner-metric-card">
+        <span class="metric-label">Handover Context Loss Risk Score</span>
+        <div class="metric-value-huge" id="risk-score-display">12.4 / 100</div>
+        <span style="font-size: 0.72rem; color: var(--color-success); font-weight: 600;">LOW RISK (Graph Structured)</span>
+      </div>
+
+      <div class="shift-lead-info">
+        <div class="avatar">MV</div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">OUTGOING SHIFT LEAD (ALPHA)</div>
+          <div style="font-weight: 700; font-size: 0.95rem;" id="outgoing-lead">Marcus Vance (SRE Lead)</div>
+        </div>
+        <div style="font-size: 1.2rem; color: var(--text-muted); margin: 0 8px;">➔</div>
+        <div class="avatar" style="background: var(--accent-purple);">ER</div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">INCOMING SHIFT LEAD (BETA)</div>
+          <div style="font-weight: 700; font-size: 0.95rem;" id="incoming-lead">Elena Rostova (SRE Lead)</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 6px;">
+        <span class="metric-label">Handover Status</span>
+        <span id="handover-status-badge" class="freshness-badge badge-delayed" style="font-size: 0.85rem; padding: 4px 12px;">IN_REVIEW</span>
+        <span style="font-size: 0.72rem; color: var(--text-muted);" id="apps-impacted-text">480 Enterprise Apps Impacted</span>
+      </div>
+    </div>
+
+    <!-- Main Layout Grid -->
+    <main class="main-layout">
+
+      <!-- LEFT COLUMN: Data Stream Ingestion Feed -->
+      <section class="glass-card" style="grid-column: span 1;">
+        <div class="card-title">
+          <span>Operational Data Streams</span>
+          <span style="font-size: 0.72rem; color: var(--accent-cyan); cursor: pointer;" onclick="fetchWorkspaceData()">Refresh</span>
+        </div>
+
+        <!-- Chat Stream Section -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); display: flex; justify-content: space-between;">
+            <span>Slack #incident-identity-core</span>
+            <span id="chat-count-tag" style="font-size: 0.7rem; color: var(--text-muted);">5 items</span>
+          </div>
+          <div id="chat-stream-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Telemetry Dashboards Section -->
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">
+            Telemetry & Error Rates
+          </div>
+          <div id="metrics-container" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Ownership Rotation Section -->
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">
+            On-Call Ownership Transfer
+          </div>
+          <div id="ownership-container" class="stream-item">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- CENTER COLUMN: Shift Handover Workspace Canvas -->
+      <section class="glass-card" style="grid-column: span 1;">
+        <div class="card-title">
+          <span>Structured Shift Handover Workspace</span>
+          <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="openAddHypothesisModal()">+ New Hypothesis</button>
+        </div>
+
+        <!-- Hypothesis Graph Section -->
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">Hypothesis-Evidence Graph</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">Linked Evidence Items</span>
+          </div>
+          <div id="hypotheses-container" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Unresolved Actions & Change Review Section -->
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">Unresolved Action Queue & Rollback Controls</span>
+            <span style="font-size: 0.72rem; color: var(--color-warning);">2-Person Review Enforced</span>
+          </div>
+          <div id="actions-container" style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Shift Summary & Sign-off Section -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; margin-top: 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-weight: 700; font-size: 0.88rem; color: var(--accent-cyan);">
+            Shift Handover Summary & Sign-Off
+          </div>
+          <p id="shift-summary-text" style="font-size: 0.82rem; color: var(--text-secondary);">
+            Loading shift summary...
+          </p>
+
+          <div style="display: flex; gap: 10px; margin-top: 6px;">
+            <input type="text" id="outgoing-sig-input" placeholder="Outgoing Signature (Marcus Vance)" value="Marcus Vance" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem;">
+            <input type="text" id="incoming-sig-input" placeholder="Incoming Signature (Elena Rostova)" value="Elena Rostova" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem;">
+            <button class="btn btn-success" onclick="submitHandoverSignoff()">Accept Handover</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: Operational & Benchmark Panels -->
+      <section class="glass-card" style="grid-column: span 1;">
+        
+        <!-- Tab Navigation Header -->
+        <div class="tab-header">
+          <button class="tab-btn active" onclick="switchTab(event, 'tab-benchmarking')">Benchmark</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-edge-cases')">Edge Cases</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-audit-trail')">Audit Trail</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-docs')">Docs</button>
+        </div>
+
+        <!-- TAB 1: Benchmarking & Evaluation -->
+        <div id="tab-benchmarking" class="tab-content active">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
+              Measurable Handover Context Loss Reduction
+            </div>
+            <p style="font-size: 0.78rem; color: var(--text-muted);">
+              Monte Carlo simulation comparing Unstructured Baseline vs. Structured Workspace on incident recovery delay.
+            </p>
+
+            <button class="btn btn-primary" onclick="runBenchmark()">Run Monte Carlo Simulation (100 Trials)</button>
+
+            <div class="chart-container" style="margin-top: 8px;">
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-cyan);">Handover Context Loss Delay</div>
+              
+              <div class="chart-bar-group">
+                <div class="bar-wrapper">
+                  <span class="bar-label">Unstructured Baseline</span>
+                  <div class="bar-fill-container">
+                    <div class="bar-fill-baseline" id="bar-baseline"></div>
+                  </div>
+                  <span id="delay-baseline-val" style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: #f87171;">48.5 min</span>
+                </div>
+
+                <div class="bar-wrapper">
+                  <span class="bar-label">Structured Workspace</span>
+                  <div class="bar-fill-container">
+                    <div class="bar-fill-solution" id="bar-solution"></div>
+                  </div>
+                  <span id="delay-solution-val" style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: #34d399;">14.2 min</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Key Results Box -->
+            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                <span style="color: var(--text-muted);">Delay Reduction:</span>
+                <span id="bench-reduction-pct" style="font-weight: 700; color: var(--color-success);">70.7% (34.3 min saved)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                <span style="color: var(--text-muted);">Total MTTR Reduction:</span>
+                <span id="bench-mttr-pct" style="font-weight: 700; color: var(--accent-cyan);">23.7% (145.0m ➔ 110.7m)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                <span style="color: var(--text-muted);">Diagnostic Rework Rate:</span>
+                <span id="bench-rework-val" style="font-weight: 700; color: #f59e0b;">68.0% ➔ 8.0%</span>
+              </div>
+            </div>
+
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-style: italic; background: rgba(0,0,0,0.2); padding: 8px; border-radius: var(--radius-sm);" id="bench-error-analysis">
+              Click 'Run Monte Carlo Simulation' to compute statistical confidence bounds.
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Edge Cases & Resilience Simulator -->
+        <div id="tab-edge-cases" class="tab-content">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
+              Resilience & Fault Tolerance Testing
+            </div>
+            <p style="font-size: 0.78rem; color: var(--text-muted);">
+              Test shift handover functionality under missing, delayed, or degraded enterprise data streams.
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              
+              <!-- Edge Case 1 -->
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-weight: 600; font-size: 0.82rem;">Edge Case 1: Chat Stream Disconnected</div>
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('chat_excerpts', 'MISSING')">Set MISSING</button>
+                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('chat_excerpts', 'FRESH')">Set FRESH</button>
+                </div>
+              </div>
+
+              <!-- Edge Case 2 -->
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-weight: 600; font-size: 0.82rem;">Edge Case 2: Telemetry Ingestion Delayed (15m)</div>
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: var(--color-warning);" onclick="toggleSource('dashboards', 'DELAYED')">Set DELAYED</button>
+                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('dashboards', 'FRESH')">Set FRESH</button>
+                </div>
+              </div>
+
+              <!-- Edge Case 3 -->
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-weight: 600; font-size: 0.82rem;">Edge Case 3: Action Log Indexing Offline</div>
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('action_logs', 'STALE')">Set STALE</button>
+                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('action_logs', 'FRESH')">Set FRESH</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: Audit Trail -->
+        <div id="tab-audit-trail" class="tab-content">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-weight: 700; font-size: 0.9rem;">Immutable Audit Trail</div>
+            <div id="audit-trail-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: Docs & Deployment Checklist -->
+        <div id="tab-docs" class="tab-content">
+          <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.78rem; color: var(--text-secondary);">
+            <div style="font-weight: 700; font-size: 0.9rem; color: #fff;">Architecture & Ethics Overview</div>
+            <p>
+              <strong>Enterprise Internal Identity Service:</strong> Core OAuth2/OIDC token provider for 480 internal applications.
+            </p>
+            <p>
+              <strong>Handover Context Loss Mitigation:</strong> Captures hypotheses, links empirical evidence from 5 data streams, enforces 2-person change review approvals, and provides a 1-click execution rollback path.
+            </p>
+            <div style="font-weight: 700; color: #fff; margin-top: 8px;">Ethics & Data Security Note</div>
+            <p>
+              Chat transcripts and action logs are anonymized to protect PII. Access permissions enforced via role-based access controls (RBAC).
+            </p>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Evidence Drill-Down Modal -->
+  <div id="evidence-modal" class="modal-overlay">
+    <div class="modal-container">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+        <h3 id="modal-title" style="font-size: 1.1rem; color: var(--accent-cyan);">Evidence Evidence Drill-Down</h3>
+        <button class="btn btn-secondary" style="padding: 2px 8px;" onclick="closeModal()">✕</button>
+      </div>
+
+      <div id="modal-content" style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem;">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Hypothesis Modal -->
+  <div id="add-hypo-modal" class="modal-overlay">
+    <div class="modal-container">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+        <h3 style="font-size: 1.1rem; color: var(--accent-indigo);">Add Operational Hypothesis</h3>
+        <button class="btn btn-secondary" style="padding: 2px 8px;" onclick="closeAddHypoModal()">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label style="font-size: 0.78rem; color: var(--text-muted);">Title</label>
+          <input type="text" id="new-hypo-title" placeholder="e.g. Identity Pod Memory Leak in Worker Cluster" style="width: 100%; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: var(--radius-sm);">
+        </div>
+        <div>
+          <label style="font-size: 0.78rem; color: var(--text-muted);">Description</label>
+          <textarea id="new-hypo-desc" rows="3" placeholder="Describe rationale and expected indicators..." style="width: 100%; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: var(--radius-sm);"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="submitNewHypothesis()">Create Hypothesis</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
