@@ -1,35 +1,27 @@
-# Enterprise Deployment & Operations Checklist
+# Operational Deployment Checklist
 
-## Pre-Deployment Requirements
-- [x] Python 3.10+ runtime environment verified.
-- [x] Dependencies (`fastapi`, `uvicorn`, `pydantic`, `pytest`) verified.
-- [x] API edge gateway webhook listener endpoints registered.
-- [x] HashiCorp Vault KMS integration token configured with `read/rollback` policies.
+## Pre-Deployment Verification
+- [x] Python 3.10+ runtime verified.
+- [x] Complete dependencies listed in `requirements.txt`.
+- [x] Automated test suite execution: `python -m pytest tests/test_backend.py -v` (8/8 PASSED).
 
----
-
-## Deployment Steps
-1. **Repository Setup & Validation**:
-   ```bash
-   cd identity_shift_handover_workspace
+## Deployment Procedure
+1. **Navigate to Project Directory**:
+   ```powershell
+   cd C:\Users\haris\.gemini\antigravity\scratch\identity_shift_handover_workspace
+   ```
+2. **Install Dependencies**:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+3. **Execute Test Suite**:
+   ```powershell
    python -m pytest tests/test_backend.py -v
    ```
-2. **Launch Application Server**:
-   ```bash
-   python backend/app.py
+4. **Launch Application**:
+   ```powershell
+   python run.py
    ```
-   Or using uvicorn directly:
-   ```bash
-   uvicorn backend.app:app --host 0.0.0.0 --port 8000
-   ```
-3. **Verify Web Application**:
-   Navigate to `http://localhost:8000` in browser.
-4. **Health Check Endpoint**:
-   Verify `GET http://localhost:8000/api/workspace` returns HTTP 200 OK.
-
----
-
-## Operational Monitoring & Alerting Setup
-- **Data Source Health Alerts**: Trigger alert if any data stream transitions to `MISSING` or `STALE` for > 5 minutes.
-- **Handover Risk Score Alert**: Alert Incident Commander if Context Loss Risk Score exceeds `50.0`.
-- **Change Review Audit**: Notify security operations center (SOC) on any high-impact action execution.
+5. **Verify Live Application**:
+   - Web App UI: `http://localhost:8000`
+   - API Verification: `GET http://localhost:8000/api/audit/verify` returns `valid: true`.

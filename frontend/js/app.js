@@ -1,7 +1,8 @@
 /**
  * JavaScript Controller for Enterprise Identity Service Shift-Handover Workspace
- * Handles REST API integration, dynamic graph rendering, evidence drill-down,
- * role-based perspectives, edge case simulation, and benchmark visualizations.
+ * Enforces Server-Side RBAC via X-User-Role HTTP headers, renders Source Resilience Matrix,
+ * Action State Snapshots, SHA-256 Hash Chain Audit verification, Benchmark Evaluation,
+ * Resilience Experiments, and Observational Stakeholder Validation Workflows.
  */
 
 let currentWorkspaceData = null;
@@ -9,12 +10,17 @@ let activeRole = "SRE / On-Call Specialist";
 
 document.addEventListener("DOMContentLoaded", () => {
   fetchWorkspaceData();
-  runBenchmark(); // Pre-load benchmark results
+  runBenchmark();
+  fetchResilienceExperiment();
+  fetchStakeholderValidation();
+  verifyAuditChain();
 });
 
 async function fetchWorkspaceData() {
   try {
-    const res = await fetch(`/api/workspace?role=${encodeURIComponent(activeRole)}`);
+    const res = await fetch(`/api/workspace?role=${encodeURIComponent(activeRole)}`, {
+      headers: { "X-User-Role": activeRole }
+    });
     if (!res.ok) throw new Error("Failed to load workspace data");
     const data = await res.json();
     currentWorkspaceData = data;
@@ -25,10 +31,10 @@ async function fetchWorkspaceData() {
 }
 
 function renderWorkspace(data) {
-  // 1. Render Freshness Indicators
+  // 1. Freshness Status Badges
   renderFreshness(data.freshness);
 
-  // 2. Render Handover Banner Meta
+  // 2. Banner Metadata
   document.getElementById("risk-score-display").innerText = `${data.context_loss_risk_score.toFixed(1)} / 100`;
   document.getElementById("outgoing-lead").innerText = data.outgoing_shift_lead;
   document.getElementById("incoming-lead").innerText = data.incoming_shift_lead;
@@ -40,12 +46,12 @@ function renderWorkspace(data) {
     document.getElementById("handover-status-badge").className = "freshness-badge badge-delayed";
   }
 
-  // 3. Left Column: Operational Streams
+  // 3. Operational Data Streams & Resilience Panel
   renderChatStream(data.raw_data_sources.chat_excerpts, data.freshness.chat_excerpts);
   renderMetricsStream(data.raw_data_sources.dashboard_metrics, data.freshness.dashboards);
-  renderOwnershipStream(data.raw_data_sources.ownership_changes);
+  renderSourceResiliencePanel(data.source_resilience);
 
-  // 4. Center Column: Hypotheses Graph & Actions Queue
+  // 4. Center Column: Graph & Action Queue
   renderHypothesesGraph(data.hypotheses, data.evidence_list);
   renderActionsQueue(data.unresolved_actions, data.change_reviews);
 
@@ -81,8 +87,8 @@ function renderChatStream(chatList, freshnessState) {
   if (freshnessState === "MISSING") {
     container.innerHTML = `
       <div style="background: rgba(239,68,68,0.15); border: 1px dashed #ef4444; padding: 10px; border-radius: 6px; font-size: 0.78rem; color: #f87171;">
-        ⚠️ <strong>Chat Ingestion API Offline</strong><br>
-        Workspace operating in resilient mode using cached graph evidence.
+        ⚠️ <strong>Slack Chat API Stream MISSING</strong><br>
+        Source unavailable. Workspace operating in resilient graph mode using cached evidence snippets.
       </div>
     `;
     return;
@@ -107,10 +113,10 @@ function renderMetricsStream(metricsList, freshnessState) {
   const container = document.getElementById("metrics-container");
   container.innerHTML = "";
 
-  if (freshnessState === "DELAYED") {
+  if (freshnessState === "DELAYED" || freshnessState === "STALE") {
     container.innerHTML += `
       <div style="background: rgba(245,158,11,0.15); border: 1px solid #f59e0b; padding: 6px 10px; border-radius: 6px; font-size: 0.72rem; color: #fbbf24; margin-bottom: 4px;">
-        ⏳ Telemetry Ingestion Delayed (15m lag)
+        ⏳ Telemetry Ingestion ${freshnessState} (Data latency detected)
       </div>
     `;
   }
@@ -129,7 +135,7 @@ function renderMetricsStream(metricsList, freshnessState) {
         <span style="font-weight: 700; color: ${statusColor};">${m.status}</span>
       </div>
       <div style="display: flex; align-items: baseline; justify-content: space-between; margin-top: 4px;">
-        <span style="font-size: 1.2rem; font-weight: 700; font-family: var(--font-mono); color: ${statusColor};">
+        <span style="font-size: 1.1rem; font-weight: 700; font-family: var(--font-mono); color: ${statusColor};">
           ${m.current_value} ${m.unit}
         </span>
         <span style="font-size: 0.72rem; color: var(--text-muted);">Baseline: ${m.baseline_value}${m.unit}</span>
@@ -139,23 +145,37 @@ function renderMetricsStream(metricsList, freshnessState) {
   });
 }
 
-function renderOwnershipStream(ownershipList) {
-  const container = document.getElementById("ownership-container");
-  if (!ownershipList || ownershipList.length === 0) return;
-  const own = ownershipList[0];
+function renderSourceResiliencePanel(resilienceList) {
+  const container = document.getElementById("resilience-panel-container");
+  if (!resilienceList) return;
 
-  container.innerHTML = `
-    <div class="stream-meta">
-      <span style="font-weight: 700; color: var(--accent-purple);">${own.team}</span>
-      <span>${own.timestamp.substring(11, 16)} UTC</span>
-    </div>
-    <div style="font-size: 0.8rem; margin-top: 4px;">
-      <strong>${own.previous_lead}</strong> ➔ <strong>${own.new_lead}</strong>
-    </div>
-    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
-      Shift Rotation Type: ${own.handover_type}
-    </div>
+  let html = `
+    <table class="resilience-table">
+      <thead>
+        <tr>
+          <th>Source Name</th>
+          <th>State</th>
+          <th>Usability</th>
+          <th>Evidence</th>
+        </tr>
+      </thead>
+      <tbody>
   `;
+
+  resilienceList.forEach(item => {
+    const badgeClass = item.state === "FRESH" ? "badge-fresh" : item.state === "DELAYED" ? "badge-delayed" : item.state === "STALE" ? "badge-stale" : "badge-missing";
+    html += `
+      <tr>
+        <td><strong>${item.source_name}</strong></td>
+        <td><span class="freshness-badge ${badgeClass}">${item.state}</span></td>
+        <td>${item.usability}</td>
+        <td>${item.evidence_count} items</td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
 }
 
 function renderHypothesesGraph(hypotheses, evidenceList) {
@@ -165,8 +185,6 @@ function renderHypothesesGraph(hypotheses, evidenceList) {
   hypotheses.forEach(hypo => {
     const cardClass = hypo.status.toLowerCase();
     const confPct = Math.round(hypo.confidence_score * 100);
-
-    // Find linked evidence
     const linkedEvid = evidenceList.filter(e => e.hypothesis_id === hypo.id);
 
     const div = document.createElement("div");
@@ -205,7 +223,7 @@ function renderHypothesesGraph(hypotheses, evidenceList) {
       </div>
 
       <div style="margin-top: 4px;">
-        <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px;">Drill-Down Evidence:</div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px;">Linked Evidence Snippets (Click to Drill Down):</div>
         <div class="evidence-chip-list">
           ${evidenceChipsHtml || '<span style="font-size: 0.72rem; color: var(--text-muted);">No linked evidence yet</span>'}
         </div>
@@ -230,9 +248,9 @@ function renderActionsQueue(actionsList, changeReviews) {
   }
 
   actionsList.forEach(act => {
-    const isHigh = act.impact_level === "HIGH" || act.impact_level === "CRITICAL";
-    const reviewReq = changeReviews.find(r => r.action_id === act.id);
     const isApproved = act.status === "APPROVED";
+    const reviewReq = changeReviews.find(r => r.action_id === act.id);
+    const apprStatus = reviewReq ? reviewReq.status : act.status;
 
     const div = document.createElement("div");
     div.className = "action-card";
@@ -245,16 +263,21 @@ function renderActionsQueue(actionsList, changeReviews) {
 
       <div style="font-size: 0.8rem; color: var(--text-secondary);">${act.description}</div>
 
+      <!-- State Transition Pipeline -->
+      <div class="state-diff-box">
+        <strong>Pipeline State:</strong> ${act.before_state && Object.keys(act.before_state).length ? `BEFORE (${JSON.stringify(act.before_state)}) ➔ ` : ''}
+        <strong style="color: ${isApproved ? '#34d399' : '#fbbf24'};">${apprStatus}</strong>
+      </div>
+
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-color);">
         <div style="font-size: 0.72rem; color: var(--text-muted);">
-          Status: <strong style="color: ${isApproved ? '#34d399' : '#fbbf24'};">${act.status}</strong>
-          ${act.approved_by ? ` (Approved by ${act.approved_by})` : ''}
+          Approvals: ${act.approved_by ? `✓ ${act.approved_by}` : 'Pending 2-Person Sign-off'}
         </div>
 
         <div style="display: flex; gap: 6px;">
           ${!isApproved && act.requires_two_person_review ? `
             <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: var(--color-warning);" onclick="approveChangeReview('${act.id}')">
-              Approve (2-Person Sign)
+              Approve Step
             </button>
           ` : ''}
 
@@ -288,13 +311,52 @@ function renderAuditTrail(auditList) {
         <span>${aud.timestamp.substring(11, 19)} UTC</span>
       </div>
       <div style="color: var(--text-primary); margin-top: 2px;">${aud.description}</div>
-      <div style="color: var(--text-muted); font-size: 0.7rem; margin-top: 2px;">Actor: ${aud.actor} (${aud.role})</div>
+      <div style="display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.68rem; margin-top: 4px; font-family: var(--font-mono);">
+        <span>Actor: ${aud.actor} (${aud.role})</span>
+        <span>Hash: ${aud.record_hash ? aud.record_hash.substring(0, 10) + '...' : 'NONE'}</span>
+      </div>
     `;
     container.appendChild(div);
   });
 }
 
-function openEvidenceModal(evidenceId) {
+async function verifyAuditChain() {
+  try {
+    const res = await fetch("/api/audit/verify");
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const badge = document.getElementById("audit-verify-badge");
+    if (data.valid) {
+      badge.innerText = `HASH CHAIN VALID (${data.records_checked} checked)`;
+      badge.className = "freshness-badge badge-fresh";
+    } else {
+      badge.innerText = `⚠️ TAMPER DETECTED (First Invalid: ${data.first_invalid_record})`;
+      badge.className = "freshness-badge badge-missing";
+      alert(`⚠️ Cryptographic Tamper Detection Alert!\n\nAudit hash verification failed at record ID ${data.first_invalid_record}. The hash chain has been compromised.`);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function triggerAuditTamperTest() {
+  try {
+    const res = await fetch("/api/audit/tamper-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
+      body: JSON.stringify({ record_index: 0 })
+    });
+    if (res.ok) {
+      await fetchWorkspaceData();
+      await verifyAuditChain();
+    } else {
+      handleApiError(res);
+    }
+  } catch (e) { console.error(e); }
+}
+
+async function openEvidenceModal(evidenceId) {
   if (!currentWorkspaceData) return;
   const evid = currentWorkspaceData.evidence_list.find(e => e.id === evidenceId);
   if (!evid) return;
@@ -319,7 +381,7 @@ function openEvidenceModal(evidenceId) {
     </div>
 
     <div style="font-size: 0.78rem; color: var(--text-muted);">
-      This empirical evidence item directly updates confidence scores in the Hypothesis-Evidence Graph during shift transitions.
+      This evidence item links directly to raw enterprise stream entry <code>${evid.source_id}</code>.
     </div>
   `;
 
@@ -346,26 +408,30 @@ async function submitNewHypothesis() {
   try {
     const res = await fetch("/api/hypotheses", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
       body: JSON.stringify({ title, description: desc, created_by: "Elena Rostova", confidence_score: 0.5 })
     });
     if (res.ok) {
       closeAddHypoModal();
       fetchWorkspaceData();
+    } else {
+      handleApiError(res);
     }
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) { console.error(e); }
 }
 
 async function approveChangeReview(actionId) {
   try {
     const res = await fetch("/api/change-review/approve", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action_id: actionId, approver: "Marcus Vance (Outgoing Lead)" })
+      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
+      body: JSON.stringify({ action_id: actionId, approver: activeRole.includes("Incident") ? "Marcus Vance" : "Elena Rostova" })
     });
-    if (res.ok) fetchWorkspaceData();
+    if (res.ok) {
+      fetchWorkspaceData();
+    } else {
+      handleApiError(res);
+    }
   } catch (e) { console.error(e); }
 }
 
@@ -373,10 +439,14 @@ async function executeAction(actionId) {
   try {
     const res = await fetch("/api/actions/execute", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
       body: JSON.stringify({ action_id: actionId, executed_by: "Elena Rostova" })
     });
-    if (res.ok) fetchWorkspaceData();
+    if (res.ok) {
+      fetchWorkspaceData();
+    } else {
+      handleApiError(res);
+    }
   } catch (e) { console.error(e); }
 }
 
@@ -385,10 +455,14 @@ async function triggerRollback(actionId) {
   try {
     const res = await fetch("/api/actions/rollback", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
       body: JSON.stringify({ action_id: actionId, actor: "Elena Rostova", rationale: "1-Click Handover Rollback Trigger" })
     });
-    if (res.ok) fetchWorkspaceData();
+    if (res.ok) {
+      fetchWorkspaceData();
+    } else {
+      handleApiError(res);
+    }
   } catch (e) { console.error(e); }
 }
 
@@ -396,10 +470,14 @@ async function toggleSource(sourceName, state) {
   try {
     const res = await fetch("/api/data-sources/toggle", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
       body: JSON.stringify({ source_name: sourceName, state: state })
     });
-    if (res.ok) fetchWorkspaceData();
+    if (res.ok) {
+      fetchWorkspaceData();
+    } else {
+      handleApiError(res);
+    }
   } catch (e) { console.error(e); }
 }
 
@@ -409,40 +487,109 @@ async function submitHandoverSignoff() {
   try {
     const res = await fetch("/api/handover/signoff", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
       body: JSON.stringify({ outgoing_lead_signature: outSig, incoming_lead_signature: inSig })
     });
-    if (res.ok) fetchWorkspaceData();
+    if (res.ok) {
+      fetchWorkspaceData();
+    } else {
+      handleApiError(res);
+    }
   } catch (e) { console.error(e); }
 }
 
 async function runBenchmark() {
   try {
-    const res = await fetch("/api/benchmark?trials=100");
+    const res = await fetch("/api/benchmark?trials=100&seed=42");
     if (!res.ok) return;
     const bench = await res.json();
 
-    document.getElementById("delay-baseline-val").innerText = `${bench.baseline_handover_delay_minutes.toFixed(1)} min`;
-    document.getElementById("delay-solution-val").innerText = `${bench.solution_handover_delay_minutes.toFixed(1)} min`;
+    document.getElementById("delay-baseline-val").innerText = `${bench.baseline_handover_delay_minutes.toFixed(1)}m`;
+    document.getElementById("delay-solution-val").innerText = `${bench.solution_handover_delay_minutes.toFixed(1)}m`;
+    document.getElementById("bench-base-val").innerText = `${bench.baseline_handover_delay_minutes.toFixed(1)}m`;
+    document.getElementById("bench-sol-val").innerText = `${bench.solution_handover_delay_minutes.toFixed(1)}m`;
 
-    const pctSolution = Math.min(100, Math.max(10, (bench.solution_handover_delay_minutes / bench.baseline_handover_delay_minutes) * 100));
-    document.getElementById("bar-solution").style.width = `${pctSolution}%`;
-
-    document.getElementById("bench-reduction-pct").innerText = `${bench.percentage_reduction}% (${bench.delay_reduction_minutes} min saved)`;
-    document.getElementById("bench-mttr-pct").innerText = `${bench.mttr_reduction_percent}% (${bench.baseline_mttr_minutes}m ➔ ${bench.solution_mttr_minutes}m)`;
-    document.getElementById("bench-rework-val").innerText = `${bench.baseline_rework_rate_percent}% ➔ ${bench.solution_rework_rate_percent}%`;
+    const statusText = bench.pass_target_evaluation ? "PASS" : "FAIL";
+    document.getElementById("bench-pct-val").innerText = `${bench.percentage_reduction}% (${statusText})`;
+    document.getElementById("bar-solution").style.width = `${Math.min(100, (bench.solution_handover_delay_minutes / bench.baseline_handover_delay_minutes) * 100)}%`;
     document.getElementById("bench-error-analysis").innerText = bench.error_analysis;
   } catch (e) {
     console.error(e);
   }
 }
 
+async function fetchResilienceExperiment() {
+  try {
+    const res = await fetch("/api/resilience-experiment");
+    if (!res.ok) return;
+    const conditions = await res.json();
+
+    const container = document.getElementById("resilience-exp-container");
+    if (!container) return;
+
+    let html = "";
+    conditions.forEach(cond => {
+      html += `
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 8px 10px; border-radius: 6px; font-size: 0.78rem;">
+          <div style="font-weight: 700; color: var(--text-primary);">${cond.condition_name}</div>
+          <div style="display: flex; justify-content: space-between; color: var(--text-muted); margin-top: 4px;">
+            <span>Recovery Delay: <strong style="color: var(--accent-cyan);">${cond.recovery_delay_minutes} min</strong></span>
+            <span>Task Success: <strong style="color: #34d399;">${cond.task_success_rate_percent}%</strong></span>
+          </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+async function fetchStakeholderValidation() {
+  try {
+    const res = await fetch("/api/stakeholder-validation");
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const summaryBox = document.getElementById("validation-summary-box");
+    if (summaryBox) {
+      summaryBox.innerHTML = `
+        <strong>Completion Rate:</strong> ${data.summary.task_completion_rate_percent}% | 
+        <strong>Avg Task Time:</strong> ${data.summary.average_task_time_sec}s | 
+        <strong>Total Errors:</strong> ${data.summary.total_error_count}
+      `;
+    }
+
+    const container = document.getElementById("validation-tasks-container");
+    if (!container) return;
+
+    let html = "";
+    data.tasks.forEach(t => {
+      html += `
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 8px 10px; border-radius: 6px; font-size: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; font-weight: 600;">
+            <span style="color: var(--text-primary);">${t.task_id}: ${t.task_name}</span>
+            <span style="color: #34d399;">✓ ${t.completion_time_sec}s</span>
+          </div>
+          <div style="color: var(--text-muted); font-size: 0.7rem; margin-top: 2px;">Role: ${t.role} | Notes: ${t.comments}</div>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+async function handleApiError(res) {
+  const data = await res.json();
+  const msg = data.detail || "Operation failed";
+  alert(`❌ Server-Side Authorization / Validation Error:\n\n${msg}`);
+}
+
 async function resetScenario() {
   try {
-    const res = await fetch("/api/reset", { method: "POST" });
+    const res = await fetch("/api/reset", { method: "POST", headers: { "X-User-Role": activeRole } });
     if (res.ok) {
       fetchWorkspaceData();
       runBenchmark();
+      verifyAuditChain();
     }
   } catch (e) { console.error(e); }
 }

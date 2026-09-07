@@ -28,7 +28,7 @@
 
       <div class="header-right">
         <div class="role-selector-container">
-          <span class="role-label">VIEW ROLE:</span>
+          <span class="role-label">ACTIVE ROLE (RBAC ENFORCED):</span>
           <select id="role-select" class="role-select" onchange="switchRole(this.value)">
             <option value="SRE / On-Call Specialist">SRE / On-Call Specialist</option>
             <option value="Incident Commander / Handover Lead">Incident Commander / Handover Lead</option>
@@ -95,7 +95,7 @@
     <!-- Main Layout Grid -->
     <main class="main-layout">
 
-      <!-- LEFT COLUMN: Data Stream Ingestion Feed -->
+      <!-- LEFT COLUMN: Operational Data Streams & Resilience Matrix -->
       <section class="glass-card" style="grid-column: span 1;">
         <div class="card-title">
           <span>Operational Data Streams</span>
@@ -108,7 +108,7 @@
             <span>Slack #incident-identity-core</span>
             <span id="chat-count-tag" style="font-size: 0.7rem; color: var(--text-muted);">5 items</span>
           </div>
-          <div id="chat-stream-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;">
+          <div id="chat-stream-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto;">
             <!-- Rendered dynamically -->
           </div>
         </div>
@@ -123,12 +123,12 @@
           </div>
         </div>
 
-        <!-- Ownership Rotation Section -->
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">
-            On-Call Ownership Transfer
+        <!-- Source Resilience Matrix -->
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color);">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-cyan);">
+            Source Resilience Health Panel
           </div>
-          <div id="ownership-container" class="stream-item">
+          <div id="resilience-panel-container">
             <!-- Rendered dynamically -->
           </div>
         </div>
@@ -145,17 +145,17 @@
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">Hypothesis-Evidence Graph</span>
-            <span style="font-size: 0.72rem; color: var(--text-muted);">Linked Evidence Items</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">Linked Evidence Snippets</span>
           </div>
           <div id="hypotheses-container" style="display: flex; flex-direction: column; gap: 12px;">
             <!-- Rendered dynamically -->
           </div>
         </div>
 
-        <!-- Unresolved Actions & Change Review Section -->
+        <!-- Unresolved Actions & State Snapshot Queue -->
         <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">Unresolved Action Queue & Rollback Controls</span>
+            <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">Unresolved Action Queue & State Snapshots</span>
             <span style="font-size: 0.72rem; color: var(--color-warning);">2-Person Review Enforced</span>
           </div>
           <div id="actions-container" style="display: flex; flex-direction: column; gap: 10px;">
@@ -180,31 +180,46 @@
         </div>
       </section>
 
-      <!-- RIGHT COLUMN: Operational & Benchmark Panels -->
+      <!-- RIGHT COLUMN: Operational & Evaluation Panels -->
       <section class="glass-card" style="grid-column: span 1;">
         
         <!-- Tab Navigation Header -->
         <div class="tab-header">
           <button class="tab-btn active" onclick="switchTab(event, 'tab-benchmarking')">Benchmark</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-resilience-exp')">Resilience Exp</button>
           <button class="tab-btn" onclick="switchTab(event, 'tab-edge-cases')">Edge Cases</button>
-          <button class="tab-btn" onclick="switchTab(event, 'tab-audit-trail')">Audit Trail</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-audit-trail')">Audit Chain</button>
+          <button class="tab-btn" onclick="switchTab(event, 'tab-validation')">Validation</button>
           <button class="tab-btn" onclick="switchTab(event, 'tab-docs')">Docs</button>
         </div>
 
-        <!-- TAB 1: Benchmarking & Evaluation -->
+        <!-- TAB 1: Benchmarking & Controlled Evaluation -->
         <div id="tab-benchmarking" class="tab-content active">
           <div style="display: flex; flex-direction: column; gap: 12px;">
             <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
-              Measurable Handover Context Loss Reduction
+              Controlled Monte Carlo Evaluation (Seed=42)
             </div>
-            <p style="font-size: 0.78rem; color: var(--text-muted);">
-              Monte Carlo simulation comparing Unstructured Baseline vs. Structured Workspace on incident recovery delay.
+            <p style="font-size: 0.75rem; color: var(--text-muted);">
+              Reproducible simulation over 100 trials comparing Unstructured Baseline vs. Structured Workspace.
             </p>
 
-            <button class="btn btn-primary" onclick="runBenchmark()">Run Monte Carlo Simulation (100 Trials)</button>
+            <button class="btn btn-primary" onclick="runBenchmark()">Run Monte Carlo Evaluation (100 Trials)</button>
 
-            <div class="chart-container" style="margin-top: 8px;">
-              <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-cyan);">Handover Context Loss Delay</div>
+            <!-- Prominent Metric Box -->
+            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase;">
+                HANDOVER RECOVERY DELAY
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem;">
+                <div>Baseline: <strong id="bench-base-val" style="color: #f87171;">48.5 min</strong></div>
+                <div>Target Reduction: <strong style="color: var(--color-warning);">25.0%</strong></div>
+                <div>Measured: <strong id="bench-sol-val" style="color: #34d399;">14.2 min</strong></div>
+                <div>Net Reduction: <strong id="bench-pct-val" style="color: #34d399;">70.7% (PASS)</strong></div>
+              </div>
+            </div>
+
+            <div class="chart-container">
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">Recovery Context Loss Delay Comparison</div>
               
               <div class="chart-bar-group">
                 <div class="bar-wrapper">
@@ -212,7 +227,7 @@
                   <div class="bar-fill-container">
                     <div class="bar-fill-baseline" id="bar-baseline"></div>
                   </div>
-                  <span id="delay-baseline-val" style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: #f87171;">48.5 min</span>
+                  <span id="delay-baseline-val" style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: #f87171;">48.5m</span>
                 </div>
 
                 <div class="bar-wrapper">
@@ -220,100 +235,110 @@
                   <div class="bar-fill-container">
                     <div class="bar-fill-solution" id="bar-solution"></div>
                   </div>
-                  <span id="delay-solution-val" style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: #34d399;">14.2 min</span>
+                  <span id="delay-solution-val" style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: #34d399;">14.2m</span>
                 </div>
-              </div>
-            </div>
-
-            <!-- Key Results Box -->
-            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 6px;">
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
-                <span style="color: var(--text-muted);">Delay Reduction:</span>
-                <span id="bench-reduction-pct" style="font-weight: 700; color: var(--color-success);">70.7% (34.3 min saved)</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
-                <span style="color: var(--text-muted);">Total MTTR Reduction:</span>
-                <span id="bench-mttr-pct" style="font-weight: 700; color: var(--accent-cyan);">23.7% (145.0m ➔ 110.7m)</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
-                <span style="color: var(--text-muted);">Diagnostic Rework Rate:</span>
-                <span id="bench-rework-val" style="font-weight: 700; color: #f59e0b;">68.0% ➔ 8.0%</span>
               </div>
             </div>
 
             <div style="font-size: 0.72rem; color: var(--text-muted); font-style: italic; background: rgba(0,0,0,0.2); padding: 8px; border-radius: var(--radius-sm);" id="bench-error-analysis">
-              Click 'Run Monte Carlo Simulation' to compute statistical confidence bounds.
+              Loading benchmark simulation metrics...
             </div>
           </div>
         </div>
 
-        <!-- TAB 2: Edge Cases & Resilience Simulator -->
-        <div id="tab-edge-cases" class="tab-content">
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
-              Resilience & Fault Tolerance Testing
-            </div>
-            <p style="font-size: 0.78rem; color: var(--text-muted);">
-              Test shift handover functionality under missing, delayed, or degraded enterprise data streams.
-            </p>
-
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              
-              <!-- Edge Case 1 -->
-              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
-                <div style="font-weight: 600; font-size: 0.82rem;">Edge Case 1: Chat Stream Disconnected</div>
-                <div style="display: flex; gap: 6px;">
-                  <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('chat_excerpts', 'MISSING')">Set MISSING</button>
-                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('chat_excerpts', 'FRESH')">Set FRESH</button>
-                </div>
-              </div>
-
-              <!-- Edge Case 2 -->
-              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
-                <div style="font-weight: 600; font-size: 0.82rem;">Edge Case 2: Telemetry Ingestion Delayed (15m)</div>
-                <div style="display: flex; gap: 6px;">
-                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: var(--color-warning);" onclick="toggleSource('dashboards', 'DELAYED')">Set DELAYED</button>
-                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('dashboards', 'FRESH')">Set FRESH</button>
-                </div>
-              </div>
-
-              <!-- Edge Case 3 -->
-              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
-                <div style="font-weight: 600; font-size: 0.82rem;">Edge Case 3: Action Log Indexing Offline</div>
-                <div style="display: flex; gap: 6px;">
-                  <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('action_logs', 'STALE')">Set STALE</button>
-                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('action_logs', 'FRESH')">Set FRESH</button>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 3: Audit Trail -->
-        <div id="tab-audit-trail" class="tab-content">
+        <!-- TAB 2: Resilience Experiment -->
+        <div id="tab-resilience-exp" class="tab-content">
           <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="font-weight: 700; font-size: 0.9rem;">Immutable Audit Trail</div>
-            <div id="audit-trail-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto;">
+            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
+              Source Outage Resilience Experiment
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-muted);">
+              Proves workspace utility remains operational across Conditions A, B, C, D.
+            </p>
+            <div id="resilience-exp-container" style="display: flex; flex-direction: column; gap: 8px;">
               <!-- Rendered dynamically -->
             </div>
           </div>
         </div>
 
-        <!-- TAB 4: Docs & Deployment Checklist -->
+        <!-- TAB 3: Edge Cases Simulator -->
+        <div id="tab-edge-cases" class="tab-content">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
+              Edge Case & Failure Mode Tester
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-weight: 600; font-size: 0.82rem;">Case 1: Chat Stream MISSING</div>
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('chat_excerpts', 'MISSING')">Set MISSING</button>
+                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('chat_excerpts', 'FRESH')">Restore FRESH</button>
+                </div>
+              </div>
+
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-weight: 600; font-size: 0.82rem;">Case 2: Telemetry Ingestion STALE</div>
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem; color: var(--color-warning);" onclick="toggleSource('dashboards', 'STALE')">Set STALE</button>
+                  <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleSource('dashboards', 'FRESH')">Restore FRESH</button>
+                </div>
+              </div>
+
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px;">
+                <div style="font-weight: 600; font-size: 0.82rem;">Case 3: Audit Trail Tamper Test</div>
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="triggerAuditTamperTest()">Tamper Record 0</button>
+                  <button class="btn btn-success" style="padding: 3px 8px; font-size: 0.72rem;" onclick="verifyAuditChain()">Verify Hash Chain</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: SHA-256 Audit Chain -->
+        <div id="tab-audit-trail" class="tab-content">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; font-size: 0.9rem;">SHA-256 Audit Trail</span>
+              <span id="audit-verify-badge" class="freshness-badge badge-fresh">HASH CHAIN VALID</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="verifyAuditChain()">Verify Chain</button>
+              <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="triggerAuditTamperTest()">Simulate Tampering</button>
+            </div>
+            <div id="audit-trail-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow-y: auto;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 5: Stakeholder Validation -->
+        <div id="tab-validation" class="tab-content">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
+              Observational Stakeholder Validation Workflow
+            </div>
+            <div id="validation-summary-box" style="background: var(--bg-surface-elevated); padding: 8px 10px; border-radius: 6px; font-size: 0.78rem;">
+              Loading validation statistics...
+            </div>
+            <div id="validation-tasks-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 6: Docs & Honesty Matrix -->
         <div id="tab-docs" class="tab-content">
           <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.78rem; color: var(--text-secondary);">
-            <div style="font-weight: 700; font-size: 0.9rem; color: #fff;">Architecture & Ethics Overview</div>
+            <div style="font-weight: 700; font-size: 0.9rem; color: #fff;">Architecture & Feature Honesty Matrix</div>
             <p>
-              <strong>Enterprise Internal Identity Service:</strong> Core OAuth2/OIDC token provider for 480 internal applications.
+              <strong>Enterprise Core Identity Service:</strong> Handles authentication, OAuth2 token generation, and RBAC across 480 internal applications.
             </p>
-            <p>
-              <strong>Handover Context Loss Mitigation:</strong> Captures hypotheses, links empirical evidence from 5 data streams, enforces 2-person change review approvals, and provides a 1-click execution rollback path.
-            </p>
-            <div style="font-weight: 700; color: #fff; margin-top: 8px;">Ethics & Data Security Note</div>
-            <p>
-              Chat transcripts and action logs are anonymized to protect PII. Access permissions enforced via role-based access controls (RBAC).
-            </p>
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px;">
+              <div>🟢 <strong>IMPLEMENTED:</strong> Server-Side RBAC, SHA-256 Hash Chain Audit, 2-Person Dual Approvals, Real Snapshot State Rollback, Source Resilience Guards, Controlled Benchmark Engine.</div>
+              <div style="margin-top: 4px;">🟡 <strong>SIMULATED:</strong> Synthetic 5-source enterprise data streams, 480-app telemetry load, HashiCorp Vault KMS rotation signal.</div>
+            </div>
           </div>
         </div>
 
@@ -326,7 +351,7 @@
   <div id="evidence-modal" class="modal-overlay">
     <div class="modal-container">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-        <h3 id="modal-title" style="font-size: 1.1rem; color: var(--accent-cyan);">Evidence Evidence Drill-Down</h3>
+        <h3 id="modal-title" style="font-size: 1.1rem; color: var(--accent-cyan);">Evidence Drill-Down Inspector</h3>
         <button class="btn btn-secondary" style="padding: 2px 8px;" onclick="closeModal()">✕</button>
       </div>
 

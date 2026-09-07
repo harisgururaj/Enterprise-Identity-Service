@@ -1,20 +1,31 @@
 """
 Data Generator for Enterprise Identity Service Operational Scenario.
 Generates realistic data for 5 enterprise sources, hypotheses, evidence graph,
-and shift handover state.
+hash-chained audit trail, resilience status, and shift handover state.
 """
 
 from typing import List, Dict, Any
 from datetime import datetime, timezone
-import random
+import hashlib
+import json
 
 from backend.models import (
     IncidentNote, ChatExcerpt, DashboardMetric, MetricSeriesPoint,
     OwnershipChange, ActionLog, Hypothesis, Evidence,
     FreshnessState, ImpactLevel, HypothesisStatus, EvidenceImpact,
     SourceType, ActionStatus, AuditEntry, DataFreshnessStatus,
-    ChangeReviewRequest, ShiftHandoverWorkspace
+    ChangeReviewRequest, SourceResilienceItem, ShiftHandoverWorkspace
 )
+
+
+GENESIS_HASH = "GENESIS_HASH_0000000000000000000000000000000000000000000000000000000000000000"
+
+
+def compute_audit_hash(entry_id: str, timestamp: str, actor: str, role: str, action_type: str, description: str, metadata: Dict[str, Any], previous_hash: str) -> str:
+    """Computes canonical SHA-256 hash for an audit trail entry."""
+    meta_json = json.dumps(metadata, sort_keys=True)
+    raw = f"{entry_id}|{timestamp}|{actor}|{role}|{action_type}|{description}|{meta_json}|{previous_hash}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def get_initial_data_sources() -> Dict[str, Any]:
@@ -36,7 +47,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
                 "a Vault key rotation to signing key v4.1 at 07:00 UTC. SRE team attempted rate limit adjustments and Redis session pool "
                 "flushes. Handover required due to shift transition at 09:30 UTC."
             ),
-            impacted_apps_count=480
+            impacted_apps_count=480,
+            freshness=FreshnessState.FRESH
         ),
         IncidentNote(
             id="NOTE-INC-9042-02",
@@ -50,7 +62,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
                 "are rejecting 42% of JWT tokens. Hypothesis H1 (Vault rotation) supported by Gateway key cache TTL (4h). Hypothesis H2 "
                 "(Redis memory pressure) refutes direct causation due to pool memory remaining under 45% threshold."
             ),
-            impacted_apps_count=480
+            impacted_apps_count=480,
+            freshness=FreshnessState.FRESH
         )
     ]
 
@@ -64,7 +77,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
             sender_role="SRE Lead",
             text="@channel SEV-1 declared. Enterprise Auth Service error rate hit 18.4%. Downstream apps getting HTTP 401 on valid user tokens.",
             key_takeaway="Incident declaration & initial error spike",
-            tags=["SEV-1", "ALERT"]
+            tags=["SEV-1", "ALERT"],
+            freshness=FreshnessState.FRESH
         ),
         ChatExcerpt(
             id="CHAT-8804",
@@ -74,7 +88,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
             sender_role="Security Infra Engineer",
             text="Vault auto-rotated identity token signing key `id-jwt-sig-key` from v3.9 -> v4.1 at 07:00:00Z. Rotation status marked SUCCESS in Vault.",
             key_takeaway="Vault key rotation completed at 07:00 UTC",
-            tags=["VAULT", "KEY_ROTATION"]
+            tags=["VAULT", "KEY_ROTATION"],
+            freshness=FreshnessState.FRESH
         ),
         ChatExcerpt(
             id="CHAT-8812",
@@ -84,7 +99,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
             sender_role="Gateway SRE",
             text="Wait, API Edge Gateways cache the JWKS public key set for 4 hours. The edge nodes didn't receive the webhook cache invalidation trigger because edge webhook listener timed out!",
             key_takeaway="Edge Gateways failed to receive JWKS cache invalidation trigger",
-            tags=["JWKS", "CACHE_MISMATCH", "GATEWAY"]
+            tags=["JWKS", "CACHE_MISMATCH", "GATEWAY"],
+            freshness=FreshnessState.FRESH
         ),
         ChatExcerpt(
             id="CHAT-8825",
@@ -94,7 +110,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
             sender_role="SRE Lead",
             text="Tried flushes on Redis session cluster to clear stale tokens, but Redis latency spiked to 240ms due to connection lock contention. Rolling back Redis flush action now.",
             key_takeaway="Redis flush attempt caused latency spike; action rolled back",
-            tags=["REDIS", "ACTION_LOG", "ROLLBACK"]
+            tags=["REDIS", "ACTION_LOG", "ROLLBACK"],
+            freshness=FreshnessState.FRESH
         ),
         ChatExcerpt(
             id="CHAT-8839",
@@ -104,7 +121,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
             sender_role="Incoming Shift Lead",
             text="Preparing shift handover sync. We need to confirm if rolling back signing key to v3.9 in Vault vs forcing API Gateway JWKS cache flush is safer.",
             key_takeaway="Handover preparation: Key Rollback vs Cache Flush decision required",
-            tags=["HANDOVER", "DECISION_REQUIRED"]
+            tags=["HANDOVER", "DECISION_REQUIRED"],
+            freshness=FreshnessState.FRESH
         )
     ]
 
@@ -128,7 +146,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
                 MetricSeriesPoint(time="08:00", value=14300),
                 MetricSeriesPoint(time="08:30", value=14250),
                 MetricSeriesPoint(time="09:00", value=14250)
-            ]
+            ],
+            freshness=FreshnessState.FRESH
         ),
         DashboardMetric(
             id="METRIC-AUTH-02",
@@ -148,7 +167,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
                 MetricSeriesPoint(time="08:00", value=18.2),
                 MetricSeriesPoint(time="08:30", value=18.4),
                 MetricSeriesPoint(time="09:00", value=18.6)
-            ]
+            ],
+            freshness=FreshnessState.FRESH
         ),
         DashboardMetric(
             id="METRIC-AUTH-03",
@@ -168,7 +188,8 @@ def get_initial_data_sources() -> Dict[str, Any]:
                 MetricSeriesPoint(time="08:00", value=42.5),
                 MetricSeriesPoint(time="08:30", value=42.5),
                 MetricSeriesPoint(time="09:00", value=42.5)
-            ]
+            ],
+            freshness=FreshnessState.FRESH
         ),
         DashboardMetric(
             id="METRIC-AUTH-04",
@@ -184,10 +205,11 @@ def get_initial_data_sources() -> Dict[str, Any]:
                 MetricSeriesPoint(time="07:00", value=11.5),
                 MetricSeriesPoint(time="07:15", value=12.1),
                 MetricSeriesPoint(time="07:30", value=18.5),
-                MetricSeriesPoint(time="08:00", value=240.0),  # Spike during bad action
+                MetricSeriesPoint(time="08:00", value=240.0),
                 MetricSeriesPoint(time="08:30", value=22.0),
                 MetricSeriesPoint(time="09:00", value=14.2)
-            ]
+            ],
+            freshness=FreshnessState.FRESH
         )
     ]
 
@@ -202,11 +224,12 @@ def get_initial_data_sources() -> Dict[str, Any]:
             incoming_shift="Beta Shift (09:30-18:00 UTC)",
             team="Identity & Access SRE Team",
             handover_type="ROUTINE",
-            notes="Formal shift rotation handover during ongoing SEV-1 incident. Structured Handover Workspace active."
+            notes="Formal shift rotation handover during ongoing SEV-1 incident. Structured Handover Workspace active.",
+            freshness=FreshnessState.FRESH
         )
     ]
 
-    # Data Source 5: Action Logs
+    # Data Source 5: Action Logs with State Snapshots
     action_logs = [
         ActionLog(
             id="ACT-1001",
@@ -221,7 +244,11 @@ def get_initial_data_sources() -> Dict[str, Any]:
             requires_two_person_review=False,
             executed_at="2026-09-03T07:00:00Z",
             approved_by="Automated Schedule Policy #882",
-            details={"new_key_version": "v4.1", "prev_key_version": "v3.9"}
+            before_state={"signing_key_version": "v3.9", "key_status": "ACTIVE"},
+            after_state={"signing_key_version": "v4.1", "key_status": "ACTIVE"},
+            rollback_state={"signing_key_version": "v3.9", "key_status": "ACTIVE"},
+            details={"new_key_version": "v4.1", "prev_key_version": "v3.9"},
+            freshness=FreshnessState.FRESH
         ),
         ActionLog(
             id="ACT-1002",
@@ -236,9 +263,17 @@ def get_initial_data_sources() -> Dict[str, Any]:
             requires_two_person_review=True,
             executed_at="2026-09-03T07:52:00Z",
             approved_by="Marcus Vance (Emergency Override)",
+            approver_1="Marcus Vance",
+            approver_2="Devon Zhao",
             rollback_action_id="ACT-1002-RB",
             rollback_executed_at="2026-09-03T08:10:00Z",
-            details={"latency_spike_observed_ms": 240, "reason": "Connection lock contention spike"}
+            rollback_by="Marcus Vance",
+            rollback_reason="Latency spiked to 240ms due to connection lock contention",
+            before_state={"redis_p99_latency_ms": 18.5, "error_rate_percent": 18.6},
+            after_state={"redis_p99_latency_ms": 240.0, "error_rate_percent": 18.6},
+            rollback_state={"redis_p99_latency_ms": 14.2, "error_rate_percent": 18.6},
+            details={"latency_spike_observed_ms": 240, "reason": "Connection lock contention spike"},
+            freshness=FreshnessState.FRESH
         ),
         ActionLog(
             id="ACT-1003",
@@ -251,7 +286,11 @@ def get_initial_data_sources() -> Dict[str, Any]:
             status=ActionStatus.PENDING_REVIEW,
             is_reversible=True,
             requires_two_person_review=True,
-            details={"target_gateways_count": 120, "expected_resolution": "Clears 401 JWT validation error spike"}
+            before_state={"jwt_error_rate_percent": 18.6, "stale_cache_ratio_percent": 42.5},
+            after_state={"jwt_error_rate_percent": 0.02, "stale_cache_ratio_percent": 0.0},
+            rollback_state={"jwt_error_rate_percent": 18.6, "stale_cache_ratio_percent": 42.5},
+            details={"target_gateways_count": 120, "expected_resolution": "Clears 401 JWT validation error spike"},
+            freshness=FreshnessState.FRESH
         ),
         ActionLog(
             id="ACT-1004",
@@ -264,7 +303,11 @@ def get_initial_data_sources() -> Dict[str, Any]:
             status=ActionStatus.PENDING_REVIEW,
             is_reversible=True,
             requires_two_person_review=True,
-            details={"fallback_action": True, "target_key_version": "v3.9"}
+            before_state={"signing_key_version": "v4.1"},
+            after_state={"signing_key_version": "v3.9"},
+            rollback_state={"signing_key_version": "v4.1"},
+            details={"fallback_action": True, "target_key_version": "v3.9"},
+            freshness=FreshnessState.FRESH
         )
     ]
 
@@ -278,10 +321,7 @@ def get_initial_data_sources() -> Dict[str, Any]:
 
 
 def get_initial_hypotheses_and_evidence() -> Dict[str, Any]:
-    """Generates the hypotheses and evidence graph for the shift handover workspace."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    # Evidence items linked to data sources
+    """Generates hypotheses and evidence graph for the shift handover workspace."""
     evidence_list = [
         Evidence(
             id="EVID-01",
@@ -329,7 +369,6 @@ def get_initial_hypotheses_and_evidence() -> Dict[str, Any]:
         )
     ]
 
-    # Structured Hypotheses
     hypotheses = [
         Hypothesis(
             id="HYPO-01",
@@ -376,7 +415,7 @@ def get_initial_hypotheses_and_evidence() -> Dict[str, Any]:
 
 
 def create_initial_workspace() -> ShiftHandoverWorkspace:
-    """Assembles the initial complete Shift Handover Workspace for the Enterprise Identity Service."""
+    """Assembles initial complete Shift Handover Workspace with SHA-256 hash-chained audit entries."""
     data_sources = get_initial_data_sources()
     hypo_evid = get_initial_hypotheses_and_evidence()
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -390,35 +429,97 @@ def create_initial_workspace() -> ShiftHandoverWorkspace:
         last_checked=now
     )
 
-    audit_trail = [
-        AuditEntry(
-            id="AUD-5001",
-            timestamp="2026-09-03T07:10:00Z",
-            actor="Marcus Vance",
-            role="SRE Lead",
-            action_type="INCIDENT_DECLARED",
-            description="Declared SEV-1 incident for Enterprise Identity Service",
-            metadata={"severity": "SEV-1", "incident_id": "INC-9042"}
+    source_resilience = [
+        SourceResilienceItem(
+            source_name="Incident Notes",
+            state=FreshnessState.FRESH,
+            last_updated="2026-09-03T08:45:00Z",
+            usability="FULL",
+            impact_assessment="Operational context & severity metadata intact.",
+            evidence_count=2
         ),
-        AuditEntry(
-            id="AUD-5002",
-            timestamp="2026-09-03T08:10:00Z",
-            actor="Marcus Vance",
-            role="SRE Lead",
-            action_type="ACTION_ROLLED_BACK",
-            description="Rolled back Redis flush operation ACT-1002 due to latency spike",
-            metadata={"action_id": "ACT-1002"}
+        SourceResilienceItem(
+            source_name="Slack Chat Feed",
+            state=FreshnessState.FRESH,
+            last_updated="2026-09-03T09:10:05Z",
+            usability="FULL",
+            impact_assessment="Engineering discussions and key takeaways available.",
+            evidence_count=5
         ),
-        AuditEntry(
-            id="AUD-5003",
-            timestamp="2026-09-03T09:30:00Z",
-            actor="System Handover Engine",
-            role="Handover Workspace",
-            action_type="HANDOVER_INITIALIZED",
-            description="Shift Handover workspace initialized for Alpha -> Beta shift transition",
-            metadata={"outgoing": "Marcus Vance", "incoming": "Elena Rostova"}
+        SourceResilienceItem(
+            source_name="Telemetry Dashboards",
+            state=FreshnessState.FRESH,
+            last_updated="2026-09-03T09:00:00Z",
+            usability="FULL",
+            impact_assessment="Error rates and p99 latency graphs updating normally.",
+            evidence_count=4
+        ),
+        SourceResilienceItem(
+            source_name="Ownership Rotation",
+            state=FreshnessState.FRESH,
+            last_updated="2026-09-03T09:30:00Z",
+            usability="FULL",
+            impact_assessment="Shift leads and team handover records verified.",
+            evidence_count=1
+        ),
+        SourceResilienceItem(
+            source_name="Action Logs",
+            state=FreshnessState.FRESH,
+            last_updated="2026-09-03T09:20:00Z",
+            usability="FULL",
+            impact_assessment="Execution status and reversibility state intact.",
+            evidence_count=4
         )
     ]
+
+    # Build SHA-256 Hash-Chained Audit Trail
+    audit_trail_raw = [
+        {
+            "id": "AUD-5001",
+            "timestamp": "2026-09-03T07:10:00Z",
+            "actor": "Marcus Vance",
+            "role": "SRE / On-Call Specialist",
+            "action_type": "INCIDENT_DECLARED",
+            "description": "Declared SEV-1 incident for Enterprise Identity Service",
+            "metadata": {"severity": "SEV-1", "incident_id": "INC-9042"}
+        },
+        {
+            "id": "AUD-5002",
+            "timestamp": "2026-09-03T08:10:00Z",
+            "actor": "Marcus Vance",
+            "role": "SRE / On-Call Specialist",
+            "action_type": "ACTION_ROLLED_BACK",
+            "description": "Rolled back Redis flush operation ACT-1002 due to latency spike",
+            "metadata": {"action_id": "ACT-1002"}
+        },
+        {
+            "id": "AUD-5003",
+            "timestamp": "2026-09-03T09:30:00Z",
+            "actor": "System Handover Engine",
+            "role": "Incident Commander / Handover Lead",
+            "action_type": "HANDOVER_INITIALIZED",
+            "description": "Shift Handover workspace initialized for Alpha -> Beta shift transition",
+            "metadata": {"outgoing": "Marcus Vance", "incoming": "Elena Rostova"}
+        }
+    ]
+
+    audit_trail: List[AuditEntry] = []
+    prev_hash = GENESIS_HASH
+    for item in audit_trail_raw:
+        h = compute_audit_hash(item["id"], item["timestamp"], item["actor"], item["role"], item["action_type"], item["description"], item["metadata"], prev_hash)
+        entry = AuditEntry(
+            id=item["id"],
+            timestamp=item["timestamp"],
+            actor=item["actor"],
+            role=item["role"],
+            action_type=item["action_type"],
+            description=item["description"],
+            metadata=item["metadata"],
+            previous_hash=prev_hash,
+            record_hash=h
+        )
+        audit_trail.append(entry)
+        prev_hash = h
 
     change_reviews = [
         ChangeReviewRequest(
@@ -445,7 +546,7 @@ def create_initial_workspace() -> ShiftHandoverWorkspace:
         outgoing_shift_lead="Marcus Vance (Shift Alpha)",
         incoming_shift_lead="Elena Rostova (Shift Beta)",
         handover_status="IN_REVIEW",
-        context_loss_risk_score=12.4,  # Low risk due to structured graph!
+        context_loss_risk_score=12.4,
         shift_summary=(
             "SEV-1 incident declared at 07:10 UTC following Vault key rotation to v4.1. Root cause confirmed with 92% confidence "
             "as API Edge Gateway JWKS key cache mismatch. Disproved hypotheses regarding Redis pool memory leak and Core Pod CPU "
@@ -456,6 +557,7 @@ def create_initial_workspace() -> ShiftHandoverWorkspace:
         evidence_list=hypo_evid["evidence_list"],
         unresolved_actions=unresolved_actions,
         freshness=freshness,
+        source_resilience=source_resilience,
         audit_trail=audit_trail,
         change_reviews=change_reviews
     )

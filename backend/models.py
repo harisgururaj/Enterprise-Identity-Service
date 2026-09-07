@@ -1,13 +1,13 @@
 """
 Data models for Enterprise Identity Service Shift-Handover Workspace.
 Defines schemas for Data Sources, Hypotheses, Evidence, Action Logs,
-Change Review, Audit Trail, and Benchmark Metrics.
+Change Review, Hash-Chained Audit Trail, Benchmark Metrics, Resilience Experiments,
+and Stakeholder Validation Tasks.
 """
 
 from enum import Enum
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
-from datetime import datetime
 
 
 class FreshnessState(str, Enum):
@@ -70,6 +70,7 @@ class IncidentNote(BaseModel):
     tags: List[str]
     content: str
     impacted_apps_count: int = 480
+    freshness: FreshnessState = FreshnessState.FRESH
 
 
 class ChatExcerpt(BaseModel):
@@ -81,6 +82,7 @@ class ChatExcerpt(BaseModel):
     text: str
     key_takeaway: Optional[str] = None
     tags: List[str] = []
+    freshness: FreshnessState = FreshnessState.FRESH
 
 
 class MetricSeriesPoint(BaseModel):
@@ -91,7 +93,7 @@ class MetricSeriesPoint(BaseModel):
 class DashboardMetric(BaseModel):
     id: str
     name: str
-    category: str  # e.g., Auth Throughput, Key Validation Error Rate, Redis Latency
+    category: str
     current_value: float
     unit: str
     status: str  # NORMAL, WARNING, CRITICAL
@@ -99,6 +101,7 @@ class DashboardMetric(BaseModel):
     threshold_critical: float
     trend: str  # RISING, FALLING, STABLE
     history: List[MetricSeriesPoint]
+    freshness: FreshnessState = FreshnessState.FRESH
 
 
 class OwnershipChange(BaseModel):
@@ -111,6 +114,7 @@ class OwnershipChange(BaseModel):
     team: str
     handover_type: str  # ROUTINE, EMERGENCY, ESCALATION
     notes: str
+    freshness: FreshnessState = FreshnessState.FRESH
 
 
 class ActionLog(BaseModel):
@@ -126,9 +130,17 @@ class ActionLog(BaseModel):
     requires_two_person_review: bool
     executed_at: Optional[str] = None
     approved_by: Optional[str] = None
+    approver_1: Optional[str] = None
+    approver_2: Optional[str] = None
     rollback_action_id: Optional[str] = None
     rollback_executed_at: Optional[str] = None
+    rollback_by: Optional[str] = None
+    rollback_reason: Optional[str] = None
+    before_state: Dict[str, Any] = {}
+    after_state: Dict[str, Any] = {}
+    rollback_state: Dict[str, Any] = {}
     details: Dict[str, Any] = {}
+    freshness: FreshnessState = FreshnessState.FRESH
 
 
 # --- Hypothesis & Evidence Models ---
@@ -157,7 +169,7 @@ class Hypothesis(BaseModel):
     evidence_ids: List[str] = []
 
 
-# --- Shift Handover Workspace Models ---
+# --- Shift Handover & Audit Models ---
 
 class AuditEntry(BaseModel):
     id: str
@@ -167,6 +179,15 @@ class AuditEntry(BaseModel):
     action_type: str
     description: str
     metadata: Dict[str, Any] = {}
+    previous_hash: str = ""
+    record_hash: str = ""
+
+
+class AuditVerificationResult(BaseModel):
+    valid: bool
+    records_checked: int
+    first_invalid_record: Optional[str] = None
+    timestamp: str
 
 
 class DataFreshnessStatus(BaseModel):
@@ -187,7 +208,18 @@ class ChangeReviewRequest(BaseModel):
     justification: str
     proposed_at: str
     approved_by: Optional[str] = None
+    approver_1: Optional[str] = None
+    approver_2: Optional[str] = None
     status: str = "PENDING_APPROVAL"
+
+
+class SourceResilienceItem(BaseModel):
+    source_name: str
+    state: FreshnessState
+    last_updated: str
+    usability: str
+    impact_assessment: str
+    evidence_count: int
 
 
 class ShiftHandoverWorkspace(BaseModel):
@@ -197,29 +229,57 @@ class ShiftHandoverWorkspace(BaseModel):
     started_at: str
     outgoing_shift_lead: str
     incoming_shift_lead: str
-    handover_status: str  # DRAFT, IN_REVIEW, ACCEPTED
+    handover_status: str  # IN_REVIEW, ACCEPTED
     context_loss_risk_score: float  # 0 to 100
     shift_summary: str
     hypotheses: List[Hypothesis]
     evidence_list: List[Evidence]
     unresolved_actions: List[ActionLog]
     freshness: DataFreshnessStatus
+    source_resilience: List[SourceResilienceItem] = []
     audit_trail: List[AuditEntry]
     change_reviews: List[ChangeReviewRequest]
 
 
-# --- Benchmark & Evaluation Models ---
+# --- Evaluation & Validation Models ---
 
 class BenchmarkResult(BaseModel):
     scenario: str
     trials_count: int
+    seed: int
     baseline_handover_delay_minutes: float
     solution_handover_delay_minutes: float
     delay_reduction_minutes: float
     percentage_reduction: float
+    target_reduction_percent: float = 25.0
+    pass_target_evaluation: bool = True
+    baseline_std_dev: float
+    solution_std_dev: float
+    confidence_interval_95: str
     baseline_mttr_minutes: float
     solution_mttr_minutes: float
     mttr_reduction_percent: float
     baseline_rework_rate_percent: float
     solution_rework_rate_percent: float
     error_analysis: str
+
+
+class ResilienceConditionResult(BaseModel):
+    condition_id: str
+    condition_name: str
+    chat_state: FreshnessState
+    recovery_delay_minutes: float
+    task_success_rate_percent: float
+    critical_evidence_available: bool
+    status: str  # OPERATIONAL, DEGRADED
+
+
+class StakeholderValidationTask(BaseModel):
+    task_id: str
+    task_name: str
+    completed: bool
+    completion_time_sec: float
+    error_count: int
+    comments: str
+    role: str
+    timestamp: str
