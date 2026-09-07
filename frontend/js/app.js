@@ -26,10 +26,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function getAuthHeaders() {
   const nameInput = document.getElementById("demo-username-input");
-  const name = nameInput ? nameInput.value.strip() || activeUsername : activeUsername;
+  const name = nameInput && nameInput.value ? nameInput.value.trim() : activeUsername;
   return {
     "X-User-Role": activeRole,
-    "X-User-Name": name,
+    "X-User-Name": name || activeUsername,
     "Content-Type": "application/json"
   };
 }
@@ -333,7 +333,7 @@ function renderAuditTrail(auditList) {
 
 async function verifyAuditChain() {
   try {
-    const res = await fetch("/api/audit/verify");
+    const res = await fetch("/api/audit/verify", { headers: getAuthHeaders() });
     if (!res.ok) return;
     const data = await res.json();
 
@@ -511,7 +511,7 @@ async function submitHandoverSignoff() {
 
 async function runBenchmark() {
   try {
-    const res = await fetch("/api/benchmark?trials=100&seed=42");
+    const res = await fetch("/api/benchmark?trials=100&seed=42", { headers: getAuthHeaders() });
     if (!res.ok) return;
     const bench = await res.json();
 
@@ -531,7 +531,7 @@ async function runBenchmark() {
 
 async function fetchResilienceExperiment() {
   try {
-    const res = await fetch("/api/resilience-experiment?trials=100&seed=42");
+    const res = await fetch("/api/resilience-experiment?trials=100&seed=42", { headers: getAuthHeaders() });
     if (!res.ok) return;
     const summary = await res.json();
 
@@ -556,7 +556,7 @@ async function fetchResilienceExperiment() {
 
 async function fetchStakeholderValidation() {
   try {
-    const res = await fetch("/api/stakeholder-validation");
+    const res = await fetch("/api/stakeholder-validation", { headers: getAuthHeaders() });
     if (!res.ok) return;
     const data = await res.json();
 

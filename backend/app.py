@@ -108,19 +108,35 @@ init_stakeholder_tasks("NOT_TESTED")
 
 # --- Authentication & RBAC Dependencies ---
 
+SOURCE_EXPLICIT_MAP = {
+    "incident_notes": "Incident Notes",
+    "chat_excerpts": "Slack Chat Stream",
+    "dashboards": "Datadog Telemetry",
+    "ownership_changes": "AWS IAM / Ownership Log",
+    "action_logs": "ServiceNow Action Log"
+}
+
+
 def get_authenticated_user(
     x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
     x_user_name: Optional[str] = Header(None, alias="X-User-Name")
 ) -> AuthUserIdentity:
     """
     Prototype Demo Authentication Dependency.
-    - Missing role header -> HTTP 401 Unauthorized (never defaults to SRE).
-    - Invalid role header -> HTTP 403 Forbidden.
+    - Missing X-User-Name -> HTTP 401 Unauthorized.
+    - Missing X-User-Role -> HTTP 401 Unauthorized (never defaults to SRE).
+    - Invalid X-User-Role -> HTTP 403 Forbidden.
     """
-    if not x_user_role:
+    if not x_user_name or not x_user_name.strip():
         raise HTTPException(
             status_code=401,
-            detail="Unauthorized: Missing 'X-User-Role' header. Prototype demo authentication context required."
+            detail="Unauthorized: Missing 'X-User-Name' header. Prototype authentication context required."
+        )
+
+    if not x_user_role or not x_user_role.strip():
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized: Missing 'X-User-Role' header. Prototype authentication context required."
         )
 
     valid_roles = [r.value for r in UserRole]
@@ -130,8 +146,7 @@ def get_authenticated_user(
             detail=f"Forbidden: Role '{x_user_role}' is invalid. Allowed roles: {valid_roles}"
         )
 
-    username = x_user_name.strip() if x_user_name else "Authenticated User"
-    return AuthUserIdentity(username=username, role=x_user_role)
+    return AuthUserIdentity(username=x_user_name.strip(), role=x_user_role.strip())
 
 
 def require_role(allowed_roles: List[str]):
@@ -180,22 +195,21 @@ def add_audit_entry(actor: str, role: str, action_type: str, description: str, m
 
 @app.get("/api/workspace")
 def get_workspace(
-    role: Optional[str] = Query(None, alias="role"),
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role")
+    auth_user: AuthUserIdentity = Depends(get_authenticated_user)
 ):
-    """[PUBLIC DEMO READ] Returns Shift Handover Workspace state and resilience health matrix."""
+    """[AUTHENTICATED READ] Returns Shift Handover Workspace state and resilience health matrix."""
     global workspace_state
-    active_role = x_user_role or role or "SRE / On-Call Specialist"
-
     resp = workspace_state.model_dump()
-    resp["active_role"] = active_role
+    resp["active_role"] = auth_user.role
     resp["raw_data_sources"] = raw_data_sources
     return resp
 
 
 @app.get("/api/data-sources")
-def get_data_sources():
-    """[PUBLIC DEMO READ] Returns raw data from 5 enterprise data sources."""
+def get_data_sources(
+    auth_user: AuthUserIdentity = Depends(get_authenticated_user)
+):
+    """[AUTHENTICATED READ] Returns raw data from 5 enterprise data sources."""
     return {
         "freshness": workspace_state.freshness.model_dump(),
         "data_sources": raw_data_sources
@@ -208,7 +222,7 @@ def toggle_data_source_state(
     state: FreshnessState = Body(..., embed=True),
     auth_user: AuthUserIdentity = Depends(require_role(["SRE / On-Call Specialist", "Incident Commander / Handover Lead"]))
 ):
-    """[AUTHENTICATED MUTATION] Toggles data source freshness state for resilience testing."""
+    """[AUTHENTICATED MUTATION] Toggles data source freshness state using explicit source map."""
     global workspace_state
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -216,8 +230,9 @@ def toggle_data_source_state(
         setattr(workspace_state.freshness, source_name, state)
         workspace_state.freshness.last_checked = now
 
+        target_display_name = SOURCE_EXPLICIT_MAP.get(source_name)
         for item in workspace_state.source_resilience:
-            if item.source_name.lower().replace(" ", "_").startswith(source_name.split("_")[0]):
+            if target_display_name and item.source_name == target_display_name:
                 item.state = state
                 item.last_updated = now
                 if state == FreshnessState.FRESH:
@@ -536,8 +551,10 @@ def rollback_action(
 
 
 @app.get("/api/audit/verify")
-def verify_audit_trail() -> AuditVerificationResult:
-    """[PUBLIC DEMO READ] Verifies SHA-256 hash chain integrity of audit trail."""
+def verify_audit_trail(
+    auth_user: AuthUserIdentity = Depends(get_authenticated_user)
+) -> AuditVerificationResult:
+    """[AUTHENTICATED READ] Verifies SHA-256 hash chain integrity of audit trail."""
     global workspace_state
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -620,19 +637,29 @@ def signoff_handover(
 
 
 @app.get("/api/benchmark")
-def get_benchmark(trials: int = Query(100, ge=10, le=1000), seed: int = Query(42)):
-    """[PUBLIC DEMO READ] Runs controlled Monte Carlo simulation (seed=42, 100 trials)."""
+def get_benchmark(
+    trials: int = Query(100, ge=10, le=1000),
+    seed: int = Query(42),
+    auth_user: AuthUserIdentity = Depends(get_authenticated_user)
+):
+    """[AUTHENTICATED READ] Runs controlled Monte Carlo simulation (seed=42, 100 trials)."""
     return run_handover_benchmark(trials=trials, seed=seed)
 
 
 @app.get("/api/resilience-experiment")
-def get_resilience_experiment(trials: int = Query(100, ge=10, le=500), seed: int = Query(42)):
-    """[PUBLIC DEMO READ] Runs controlled simulated resilience experiment across 4 chat availability conditions."""
+def get_resilience_experiment(
+    trials: int = Query(100, ge=10, le=500),
+    seed: int = Query(42),
+    auth_user: AuthUserIdentity = Depends(get_authenticated_user)
+):
+    """[AUTHENTICATED READ] Runs controlled simulated resilience experiment across 4 chat availability conditions."""
     return run_resilience_experiment(trials_per_condition=trials, seed=seed)
 
 
 @app.get("/api/stakeholder-validation")
-def get_stakeholder_validation():
+def get_stakeholder_validation(
+    auth_user: AuthUserIdentity = Depends(get_authenticated_user)
+):
     """[PUBLIC DEMO READ] Returns observational stakeholder validation tasks and summary statistics."""
     observed = [t for t in stakeholder_tasks_store if t.validation_status == ValidationCategory.OBSERVED_VALIDATION and t.completed]
     avg_time = sum(t.completion_time_sec for t in observed if t.completion_time_sec) / len(observed) if observed else 0.0

@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-green.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Pytest Passed](https://img.shields.io/badge/Tests-12%2F12%20PASSED-brightgreen.svg)]()
+[![Pytest Passed](https://img.shields.io/badge/Tests-15%2F15%20PASSED-brightgreen.svg)]()
 
 > **From Operational Pain to Working Product**: An internal identity service used by every application in a large enterprise. During operational incidents, shift handovers lose context between outgoing and incoming engineers, causing repeated diagnostics, delayed recovery, unresolved actions, and increased MTTR.
 

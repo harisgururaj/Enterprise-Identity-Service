@@ -1,8 +1,9 @@
 """
 Comprehensive Pytest Integration and Security Suite for Enterprise Identity Service Shift-Handover Workspace.
-Verifies HTTP 401/403 RBAC authorization, prototype demo identity context, 2-person dual user approvals,
-generic state snapshot rollbacks, SHA-256 audit hash chain tamper detection, handover signoff validation,
-restricted admin endpoints, controlled benchmark reproducibility, resilience experiments, and stakeholder validation.
+Verifies HTTP 401/403 RBAC authorization, prototype demo identity context, impersonation prevention,
+2-person dual user approvals, generic state snapshot rollbacks, SHA-256 audit hash chain tamper detection,
+handover signoff validation, restricted admin endpoints, controlled benchmark reproducibility, resilience experiments,
+and honest stakeholder validation.
 """
 
 import pytest
@@ -24,7 +25,14 @@ def setup_function():
 
 def test_missing_role_header_returns_401_unauthorized():
     """Verify missing X-User-Role header returns HTTP 401 Unauthorized (never defaults to SRE)."""
-    res = client.post("/api/hypotheses", json={"title": "Test", "description": "Test"})
+    res = client.post("/api/hypotheses", headers={"X-User-Name": "Elena"}, json={"title": "Test", "description": "Test"})
+    assert res.status_code == 401
+    assert "Unauthorized" in res.json()["detail"]
+
+
+def test_missing_username_header_returns_401_unauthorized():
+    """Verify missing X-User-Name header returns HTTP 401 Unauthorized."""
+    res = client.post("/api/hypotheses", headers={"X-User-Role": "SRE / On-Call Specialist"}, json={"title": "Test", "description": "Test"})
     assert res.status_code == 401
     assert "Unauthorized" in res.json()["detail"]
 
@@ -33,10 +41,25 @@ def test_invalid_role_header_returns_403_forbidden():
     """Verify invalid X-User-Role header returns HTTP 403 Forbidden."""
     res = client.post(
         "/api/hypotheses",
-        headers={"X-User-Role": "SuperAdminFakeRole"},
+        headers={"X-User-Role": "SuperAdminFakeRole", "X-User-Name": "Elena"},
         json={"title": "Test", "description": "Test"}
     )
     assert res.status_code == 403
+
+
+def test_body_actor_impersonation_ignored():
+    """Verify passing fake actor string in JSON body does NOT impersonate; audit records header username."""
+    res = client.post(
+        "/api/hypotheses",
+        headers=SRE_HEADERS,
+        json={
+            "title": "Impersonation Test",
+            "description": "Test",
+            "created_by": "Fake User Impersonator"
+        }
+    )
+    assert res.status_code == 200
+    assert res.json()["hypothesis"]["created_by"] == "Elena Rostova"
 
 
 def test_stakeholder_role_forbidden_actions():
@@ -72,6 +95,19 @@ def test_stakeholder_role_forbidden_actions():
         json={"source_name": "chat_excerpts", "state": "MISSING"}
     )
     assert toggle_res.status_code == 403
+
+
+def test_explicit_five_data_sources_toggling():
+    """Verify each of 5 data sources can be toggled using explicit source map."""
+    sources = ["incident_notes", "chat_excerpts", "dashboards", "ownership_changes", "action_logs"]
+    for src in sources:
+        res = client.post(
+            "/api/data-sources/toggle",
+            headers=SRE_HEADERS,
+            json={"source_name": src, "state": "MISSING"}
+        )
+        assert res.status_code == 200
+        assert res.json()["freshness"][src] == "MISSING"
 
 
 def test_two_person_dual_approval_and_same_user_rejection():
@@ -121,7 +157,7 @@ def test_generic_state_rollback_and_double_rollback_rejection():
     assert rb_res.json()["action"]["status"] == "ROLLED_BACK"
 
     # Verify metrics physically restored to 18.6%
-    ws = client.get("/api/workspace").json()
+    ws = client.get("/api/workspace", headers=SRE_HEADERS).json()
     err_metric = next(m for m in ws["raw_data_sources"]["dashboard_metrics"] if m["id"] == "METRIC-AUTH-02")
     assert err_metric["current_value"] == 18.6
 
@@ -141,7 +177,7 @@ def test_rollback_before_execution_rejection():
 def test_sha256_audit_trail_verification_and_tamper_detection():
     """Verify SHA-256 hash chain validity and automated tamper detection."""
     # 1. Verification returns valid=True
-    v1 = client.get("/api/audit/verify").json()
+    v1 = client.get("/api/audit/verify", headers=SRE_HEADERS).json()
     assert v1["valid"] is True
     assert v1["first_invalid_record"] is None
 
@@ -149,7 +185,7 @@ def test_sha256_audit_trail_verification_and_tamper_detection():
     client.post("/api/audit/tamper-test", headers=SRE_HEADERS, json={"record_index": 0})
 
     # 3. Verification returns valid=False and flags first invalid record
-    v2 = client.get("/api/audit/verify").json()
+    v2 = client.get("/api/audit/verify", headers=SRE_HEADERS).json()
     assert v2["valid"] is False
     assert v2["first_invalid_record"] == "AUD-5001"
 
@@ -179,7 +215,7 @@ def test_reset_endpoint_requires_authorization():
 
 def test_stakeholder_validation_honesty_default_not_tested():
     """Verify default stakeholder validation state is NOT_TESTED and summary only counts observed data."""
-    res = client.get("/api/stakeholder-validation").json()
+    res = client.get("/api/stakeholder-validation", headers=SRE_HEADERS).json()
     summary = res["summary"]
     assert summary["not_tested_count"] == 8
     assert summary["observed_validation_count"] == 0
@@ -199,7 +235,7 @@ def test_stakeholder_validation_honesty_default_not_tested():
         }
     )
 
-    res_after = client.get("/api/stakeholder-validation").json()
+    res_after = client.get("/api/stakeholder-validation", headers=SRE_HEADERS).json()
     summary_after = res_after["summary"]
     assert summary_after["observed_validation_count"] == 1
     assert summary_after["observed_completion_rate_percent"] == 12.5
@@ -207,12 +243,12 @@ def test_stakeholder_validation_honesty_default_not_tested():
 
 def test_controlled_benchmark_and_resilience_reproducibility():
     """Verify benchmark and resilience experiment calculations are reproducible with fixed seed."""
-    b1 = client.get("/api/benchmark?trials=100&seed=42").json()
-    b2 = client.get("/api/benchmark?trials=100&seed=42").json()
+    b1 = client.get("/api/benchmark?trials=100&seed=42", headers=SRE_HEADERS).json()
+    b2 = client.get("/api/benchmark?trials=100&seed=42", headers=SRE_HEADERS).json()
     assert b1["solution_handover_delay_minutes"] == b2["solution_handover_delay_minutes"]
     assert b1["pass_target_evaluation"] is True
 
-    r1 = client.get("/api/resilience-experiment?trials=100&seed=42").json()
-    r2 = client.get("/api/resilience-experiment?trials=100&seed=42").json()
+    r1 = client.get("/api/resilience-experiment?trials=100&seed=42", headers=SRE_HEADERS).json()
+    r2 = client.get("/api/resilience-experiment?trials=100&seed=42", headers=SRE_HEADERS).json()
     assert r1["conditions"][0]["mean_recovery_delay_minutes"] == r2["conditions"][0]["mean_recovery_delay_minutes"]
     assert len(r1["conditions"]) == 4
