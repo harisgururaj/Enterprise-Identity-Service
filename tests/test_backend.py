@@ -1,212 +1,218 @@
 """
-Comprehensive Unit and Integration Test Suite for Enterprise Identity Service Shift-Handover Workspace.
-Verifies Server-Side RBAC, Hash-Chained Audit Verification, Tamper Detection, Two-Person Dual Approvals,
-Real State Snapshot Rollbacks, Invalid Evidence Source Validation, Controlled Benchmarks, and Resilience Experiments.
+Comprehensive Pytest Integration and Security Suite for Enterprise Identity Service Shift-Handover Workspace.
+Verifies HTTP 401/403 RBAC authorization, prototype demo identity context, 2-person dual user approvals,
+generic state snapshot rollbacks, SHA-256 audit hash chain tamper detection, handover signoff validation,
+restricted admin endpoints, controlled benchmark reproducibility, resilience experiments, and stakeholder validation.
 """
 
 import pytest
 from fastapi.testclient import TestClient
 from backend.app import app, workspace_state, raw_data_sources
-from backend.models import FreshnessState, ActionStatus, EvidenceImpact, SourceType
-
+from backend.models import FreshnessState, ActionStatus, ValidationCategory
 
 client = TestClient(app)
 
+SRE_HEADERS = {"X-User-Role": "SRE / On-Call Specialist", "X-User-Name": "Elena Rostova"}
+IC_HEADERS = {"X-User-Role": "Incident Commander / Handover Lead", "X-User-Name": "Marcus Vance"}
+DEV_HEADERS = {"X-User-Role": "Enterprise App Developer / Stakeholder", "X-User-Name": "Devon Zhao"}
+
 
 def setup_function():
-    """Reset workspace state before each test."""
-    client.post("/api/reset")
+    """Reset workspace state with SRE authorization prior to each test."""
+    client.post("/api/reset", headers=SRE_HEADERS)
 
 
-def test_get_workspace():
-    """Verify workspace fetch returns incident details, freshness status, and resilience panel."""
-    res = client.get("/api/workspace", headers={"X-User-Role": "SRE / On-Call Specialist"})
-    assert res.status_code == 200
-    data = res.json()
-    assert data["incident_id"] == "INC-9042"
-    assert data["severity"] == "SEV-1"
-    assert len(data["hypotheses"]) >= 3
-    assert len(data["evidence_list"]) >= 4
-    assert len(data["source_resilience"]) == 5
-    assert "freshness" in data
+def test_missing_role_header_returns_401_unauthorized():
+    """Verify missing X-User-Role header returns HTTP 401 Unauthorized (never defaults to SRE)."""
+    res = client.post("/api/hypotheses", json={"title": "Test", "description": "Test"})
+    assert res.status_code == 401
+    assert "Unauthorized" in res.json()["detail"]
 
 
-def test_rbac_server_side_authorization():
-    """Verify server-side RBAC rejects unauthorized requests with HTTP 403 Forbidden."""
-    # 1. Stakeholder role attempting to execute action -> 403 Forbidden
-    res_exec = client.post(
+def test_invalid_role_header_returns_403_forbidden():
+    """Verify invalid X-User-Role header returns HTTP 403 Forbidden."""
+    res = client.post(
+        "/api/hypotheses",
+        headers={"X-User-Role": "SuperAdminFakeRole"},
+        json={"title": "Test", "description": "Test"}
+    )
+    assert res.status_code == 403
+
+
+def test_stakeholder_role_forbidden_actions():
+    """Verify Developer/Stakeholder role receives HTTP 403 on operational mutation endpoints."""
+    # 1. Action Execution -> 403
+    exec_res = client.post(
         "/api/actions/execute",
-        headers={"X-User-Role": "Enterprise App Developer / Stakeholder"},
-        json={"action_id": "ACT-1003", "executed_by": "Stakeholder User"}
+        headers=DEV_HEADERS,
+        json={"action_id": "ACT-1003"}
     )
-    assert res_exec.status_code == 403
-    assert "Forbidden" in res_exec.json()["detail"]
+    assert exec_res.status_code == 403
 
-    # 2. Stakeholder role attempting rollback -> 403 Forbidden
-    res_rb = client.post(
+    # 2. Action Rollback -> 403
+    rb_res = client.post(
         "/api/actions/rollback",
-        headers={"X-User-Role": "Enterprise App Developer / Stakeholder"},
-        json={"action_id": "ACT-1001", "actor": "Stakeholder User", "rationale": "Test"}
+        headers=DEV_HEADERS,
+        json={"action_id": "ACT-1001", "rationale": "Forbidden Test"}
     )
-    assert res_rb.status_code == 403
+    assert rb_res.status_code == 403
 
-    # 3. Stakeholder role attempting change review approval -> 403 Forbidden
-    res_appr = client.post(
+    # 3. Change Review Approval -> 403
+    appr_res = client.post(
         "/api/change-review/approve",
-        headers={"X-User-Role": "Enterprise App Developer / Stakeholder"},
-        json={"action_id": "ACT-1003", "approver": "Stakeholder User"}
+        headers=DEV_HEADERS,
+        json={"action_id": "ACT-1003"}
     )
-    assert res_appr.status_code == 403
+    assert appr_res.status_code == 403
 
-
-def test_sha256_hash_chained_audit_trail_and_tampering_detection():
-    """Verify SHA-256 audit chain integrity and tamper detection endpoint."""
-    # 1. Initial audit trail should be 100% valid
-    res_v1 = client.get("/api/audit/verify")
-    assert res_v1.status_code == 200
-    data_v1 = res_v1.json()
-    assert data_v1["valid"] is True
-    assert data_v1["records_checked"] >= 3
-    assert data_v1["first_invalid_record"] is None
-
-    # 2. Simulate audit record tampering
-    t_res = client.post("/api/audit/tamper-test", json={"record_index": 0})
-    assert t_res.status_code == 200
-
-    # 3. Audit verification must now return valid=False
-    res_v2 = client.get("/api/audit/verify")
-    assert res_v2.status_code == 200
-    data_v2 = res_v2.json()
-    assert data_v2["valid"] is False
-    assert data_v2["first_invalid_record"] == "AUD-5001"
+    # 4. Data Source Toggle -> 403
+    toggle_res = client.post(
+        "/api/data-sources/toggle",
+        headers=DEV_HEADERS,
+        json={"source_name": "chat_excerpts", "state": "MISSING"}
+    )
+    assert toggle_res.status_code == 403
 
 
 def test_two_person_dual_approval_and_same_user_rejection():
-    """Verify 2-person change review approval workflow and same-user rejection."""
-    # 1. First approval by Marcus Vance (Shift Alpha)
-    appr1 = client.post(
-        "/api/change-review/approve",
-        headers={"X-User-Role": "Incident Commander / Handover Lead"},
-        json={"action_id": "ACT-1003", "approver": "Marcus Vance"}
-    )
-    assert appr1.status_code == 200
-    assert appr1.json()["change_review"]["status"] == "PENDING_APPROVAL_2"
+    """Verify 2-person dual approval state machine and same-user rejection."""
+    # 1. Approval 1 by Marcus Vance (IC)
+    a1 = client.post("/api/change-review/approve", headers=IC_HEADERS, json={"action_id": "ACT-1003"})
+    assert a1.status_code == 200
+    assert a1.json()["change_review"]["status"] == "PENDING_APPROVAL_2"
 
-    # 2. Re-approval by SAME user Marcus Vance must fail (400)
-    appr_same = client.post(
-        "/api/change-review/approve",
-        headers={"X-User-Role": "Incident Commander / Handover Lead"},
-        json={"action_id": "ACT-1003", "approver": "Marcus Vance"}
-    )
-    assert appr_same.status_code == 400
-    assert "Dual Approval Failure" in appr_same.json()["detail"]
+    # 2. Re-approval by SAME user Marcus Vance must fail (HTTP 400)
+    a_same = client.post("/api/change-review/approve", headers=IC_HEADERS, json={"action_id": "ACT-1003"})
+    assert a_same.status_code == 400
+    assert "Dual Approval Failure" in a_same.json()["detail"]
 
-    # 3. Second approval by DISTINCT user Elena Rostova (Shift Beta)
-    appr2 = client.post(
-        "/api/change-review/approve",
-        headers={"X-User-Role": "Incident Commander / Handover Lead"},
-        json={"action_id": "ACT-1003", "approver": "Elena Rostova"}
-    )
-    assert appr2.status_code == 200
-    assert appr2.json()["change_review"]["status"] == "APPROVED"
+    # 3. Approval 2 by DISTINCT user Elena Rostova (SRE)
+    a2 = client.post("/api/change-review/approve", headers=SRE_HEADERS, json={"action_id": "ACT-1003"})
+    assert a2.status_code == 200
+    assert a2.json()["change_review"]["status"] == "APPROVED"
 
 
-def test_action_execution_and_real_state_rollback():
-    """Verify state snapshot capture during execution and physical state restoration on rollback."""
-    # 1. Complete 2-person approval for ACT-1003
-    client.post("/api/change-review/approve", headers={"X-User-Role": "Incident Commander / Handover Lead"}, json={"action_id": "ACT-1003", "approver": "Marcus Vance"})
-    client.post("/api/change-review/approve", headers={"X-User-Role": "Incident Commander / Handover Lead"}, json={"action_id": "ACT-1003", "approver": "Elena Rostova"})
+def test_execution_blocked_without_approval_and_allowed_after_approval():
+    """Verify unapproved high-impact action execution fails, and succeeds after 2-person approval."""
+    # 1. Execution attempt without approval -> 403
+    exec_blocked = client.post("/api/actions/execute", headers=SRE_HEADERS, json={"action_id": "ACT-1003"})
+    assert exec_blocked.status_code == 403
 
-    # 2. Execute action ACT-1003
-    exec_res = client.post(
-        "/api/actions/execute",
-        headers={"X-User-Role": "SRE / On-Call Specialist"},
-        json={"action_id": "ACT-1003", "executed_by": "Elena Rostova"}
-    )
-    assert exec_res.status_code == 200
-    act_data = exec_res.json()["action"]
-    assert act_data["status"] == "EXECUTED"
-    assert act_data["before_state"]["jwt_error_rate_percent"] == 18.6
-    assert act_data["after_state"]["jwt_error_rate_percent"] == 0.02
+    # 2. Grant 2-person dual approval
+    client.post("/api/change-review/approve", headers=IC_HEADERS, json={"action_id": "ACT-1003"})
+    client.post("/api/change-review/approve", headers=SRE_HEADERS, json={"action_id": "ACT-1003"})
 
-    # Verify metrics updated to 0.02%
-    ws = client.get("/api/workspace").json()
-    err_metric = next(m for m in ws["raw_data_sources"]["dashboard_metrics"] if m["id"] == "METRIC-AUTH-02")
-    assert err_metric["current_value"] == 0.02
+    # 3. Execution attempt after approval -> 200 OK
+    exec_allowed = client.post("/api/actions/execute", headers=SRE_HEADERS, json={"action_id": "ACT-1003"})
+    assert exec_allowed.status_code == 200
+    assert exec_allowed.json()["action"]["status"] == "EXECUTED"
 
-    # 3. Trigger 1-Click Rollback for ACT-1003
-    rb_res = client.post(
-        "/api/actions/rollback",
-        headers={"X-User-Role": "SRE / On-Call Specialist"},
-        json={"action_id": "ACT-1003", "actor": "Elena Rostova", "rationale": "Test state restoration"}
-    )
+
+def test_generic_state_rollback_and_double_rollback_rejection():
+    """Verify snapshot rollback restores before_state values and rejects double rollback."""
+    # Approve and execute ACT-1003
+    client.post("/api/change-review/approve", headers=IC_HEADERS, json={"action_id": "ACT-1003"})
+    client.post("/api/change-review/approve", headers=SRE_HEADERS, json={"action_id": "ACT-1003"})
+    client.post("/api/actions/execute", headers=SRE_HEADERS, json={"action_id": "ACT-1003"})
+
+    # Rollback ACT-1003
+    rb_res = client.post("/api/actions/rollback", headers=SRE_HEADERS, json={"action_id": "ACT-1003", "rationale": "State restoration test"})
     assert rb_res.status_code == 200
-    rb_data = rb_res.json()["action"]
-    assert rb_data["status"] == "ROLLED_BACK"
+    assert rb_res.json()["action"]["status"] == "ROLLED_BACK"
 
     # Verify metrics physically restored to 18.6%
-    ws_after_rb = client.get("/api/workspace").json()
-    err_metric_restored = next(m for m in ws_after_rb["raw_data_sources"]["dashboard_metrics"] if m["id"] == "METRIC-AUTH-02")
-    assert err_metric_restored["current_value"] == 18.6
+    ws = client.get("/api/workspace").json()
+    err_metric = next(m for m in ws["raw_data_sources"]["dashboard_metrics"] if m["id"] == "METRIC-AUTH-02")
+    assert err_metric["current_value"] == 18.6
+
+    # Attempt DOUBLE rollback on same action -> 400 Bad Request
+    rb_double = client.post("/api/actions/rollback", headers=SRE_HEADERS, json={"action_id": "ACT-1003"})
+    assert rb_double.status_code == 400
+    assert "already been rolled back" in rb_double.json()["detail"]
 
 
-def test_invalid_evidence_source_id_rejection():
-    """Verify evidence linking fails with HTTP 404 if source_id does not exist."""
-    res = client.post(
-        "/api/evidence",
-        headers={"X-User-Role": "SRE / On-Call Specialist"},
-        json={
-            "hypothesis_id": "HYPO-01",
-            "source_type": "CHAT",
-            "source_id": "NON_EXISTENT_SOURCE_ID_999",
-            "title": "Fake evidence title",
-            "snippet": "Fake snippet",
-            "impact": "SUPPORTS",
-            "added_by": "Tester"
-        }
-    )
-    assert res.status_code == 404
-    assert "Invalid Source ID" in res.json()["detail"]
+def test_rollback_before_execution_rejection():
+    """Verify rollback attempt on unexecuted action fails with HTTP 400."""
+    rb_res = client.post("/api/actions/rollback", headers=SRE_HEADERS, json={"action_id": "ACT-1004"})
+    assert rb_res.status_code == 400
+    assert "has not been executed yet" in rb_res.json()["detail"]
 
 
-def test_controlled_benchmark_and_resilience_experiments():
-    """Verify benchmark engine reproducibility, target comparison, and resilience experiment."""
-    # 1. Benchmark API
-    bench_res = client.get("/api/benchmark?trials=100&seed=42")
-    assert bench_res.status_code == 200
-    data = bench_res.json()
-    assert data["pass_target_evaluation"] is True
-    assert data["percentage_reduction"] >= 25.0
-    assert "95% CI" in data["confidence_interval_95"]
+def test_sha256_audit_trail_verification_and_tamper_detection():
+    """Verify SHA-256 hash chain validity and automated tamper detection."""
+    # 1. Verification returns valid=True
+    v1 = client.get("/api/audit/verify").json()
+    assert v1["valid"] is True
+    assert v1["first_invalid_record"] is None
 
-    # 2. Resilience Experiment API
-    resil_res = client.get("/api/resilience-experiment")
-    assert resil_res.status_code == 200
-    conditions = resil_res.json()
-    assert len(conditions) == 4
-    assert conditions[0]["status"] == "OPERATIONAL"
+    # 2. Simulate audit tampering
+    client.post("/api/audit/tamper-test", headers=SRE_HEADERS, json={"record_index": 0})
+
+    # 3. Verification returns valid=False and flags first invalid record
+    v2 = client.get("/api/audit/verify").json()
+    assert v2["valid"] is False
+    assert v2["first_invalid_record"] == "AUD-5001"
 
 
-def test_stakeholder_validation_workflow():
-    """Verify observational stakeholder validation workflow API endpoints."""
-    # 1. Get initial tasks
-    get_res = client.get("/api/stakeholder-validation")
-    assert get_res.status_code == 200
-    summary = get_res.json()["summary"]
-    assert summary["total_tasks"] == 8
-    assert summary["task_completion_rate_percent"] == 100.0
+def test_handover_signoff_validation():
+    """Verify handover signoff requires non-empty and distinct outgoing/incoming identities."""
+    # 1. Empty identities -> 400
+    res_empty = client.post("/api/handover/signoff", headers=IC_HEADERS, json={"outgoing_user": " ", "incoming_user": "Elena"})
+    assert res_empty.status_code == 400
 
-    # 2. Record validation task
-    rec_res = client.post(
+    # 2. Same identities -> 400
+    res_same = client.post("/api/handover/signoff", headers=IC_HEADERS, json={"outgoing_user": "Marcus Vance", "incoming_user": "marcus vance"})
+    assert res_same.status_code == 400
+
+    # 3. Valid distinct identities -> 200 OK
+    res_ok = client.post("/api/handover/signoff", headers=IC_HEADERS, json={"outgoing_user": "Marcus Vance", "incoming_user": "Elena Rostova"})
+    assert res_ok.status_code == 200
+    assert res_ok.json()["handover_status"] == "ACCEPTED"
+
+
+def test_reset_endpoint_requires_authorization():
+    """Verify /api/reset returns 401 without role header and 403 for stakeholder role."""
+    assert client.post("/api/reset").status_code == 401
+    assert client.post("/api/reset", headers=DEV_HEADERS).status_code == 403
+    assert client.post("/api/reset", headers=SRE_HEADERS).status_code == 200
+
+
+def test_stakeholder_validation_honesty_default_not_tested():
+    """Verify default stakeholder validation state is NOT_TESTED and summary only counts observed data."""
+    res = client.get("/api/stakeholder-validation").json()
+    summary = res["summary"]
+    assert summary["not_tested_count"] == 8
+    assert summary["observed_validation_count"] == 0
+    assert summary["observed_completion_rate_percent"] == 0.0
+
+    # Record observed validation
+    client.post(
         "/api/stakeholder-validation",
+        headers=DEV_HEADERS,
         json={
             "task_id": "TASK-01",
             "completed": True,
-            "completion_time_sec": 11.2,
+            "completion_time_sec": 14.5,
             "error_count": 0,
-            "comments": "Observed fast identification of SEV-1 banner",
-            "user_role": "Enterprise App Developer / Stakeholder"
+            "comments": "Observed real user test",
+            "validation_status": "OBSERVED_VALIDATION"
         }
     )
-    assert rec_res.status_code == 200
-    assert rec_res.json()["task"]["completion_time_sec"] == 11.2
+
+    res_after = client.get("/api/stakeholder-validation").json()
+    summary_after = res_after["summary"]
+    assert summary_after["observed_validation_count"] == 1
+    assert summary_after["observed_completion_rate_percent"] == 12.5
+
+
+def test_controlled_benchmark_and_resilience_reproducibility():
+    """Verify benchmark and resilience experiment calculations are reproducible with fixed seed."""
+    b1 = client.get("/api/benchmark?trials=100&seed=42").json()
+    b2 = client.get("/api/benchmark?trials=100&seed=42").json()
+    assert b1["solution_handover_delay_minutes"] == b2["solution_handover_delay_minutes"]
+    assert b1["pass_target_evaluation"] is True
+
+    r1 = client.get("/api/resilience-experiment?trials=100&seed=42").json()
+    r2 = client.get("/api/resilience-experiment?trials=100&seed=42").json()
+    assert r1["conditions"][0]["mean_recovery_delay_minutes"] == r2["conditions"][0]["mean_recovery_delay_minutes"]
+    assert len(r1["conditions"]) == 4

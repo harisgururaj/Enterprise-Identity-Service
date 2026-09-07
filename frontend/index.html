@@ -15,7 +15,7 @@
         <div class="brand-logo">ID</div>
         <div>
           <div class="brand-title">AUTH-CORE :: Internal Identity Service</div>
-          <div class="brand-subtitle">Resilient Shift-Handover Workspace (Enterprise Scale)</div>
+          <div class="brand-subtitle">Resilient Shift-Handover Workspace [SIMULATED ENTERPRISE SOURCES]</div>
         </div>
       </div>
 
@@ -26,9 +26,11 @@
         </div>
       </div>
 
+      <!-- Prototype Demo Identity Context (RBAC Enforced Server-Side) -->
       <div class="header-right">
         <div class="role-selector-container">
-          <span class="role-label">ACTIVE ROLE (RBAC ENFORCED):</span>
+          <span class="role-label">DEMO IDENTITY:</span>
+          <input type="text" id="demo-username-input" value="Elena Rostova" style="width: 110px; background: transparent; border: none; border-bottom: 1px solid var(--border-color); color: #fff; font-size: 0.8rem; padding: 2px;" placeholder="Username">
           <select id="role-select" class="role-select" onchange="switchRole(this.value)">
             <option value="SRE / On-Call Specialist">SRE / On-Call Specialist</option>
             <option value="Incident Commander / Handover Lead">Incident Commander / Handover Lead</option>
@@ -116,7 +118,7 @@
         <!-- Telemetry Dashboards Section -->
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
           <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">
-            Telemetry & Error Rates
+            Telemetry & Error Rates [SIMULATED OPERATIONAL STATE]
           </div>
           <div id="metrics-container" style="display: flex; flex-direction: column; gap: 8px;">
             <!-- Rendered dynamically -->
@@ -155,7 +157,7 @@
         <!-- Unresolved Actions & State Snapshot Queue -->
         <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
           <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">Unresolved Action Queue & State Snapshots</span>
+            <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary);">Unresolved Action Queue & Snapshots</span>
             <span style="font-size: 0.72rem; color: var(--color-warning);">2-Person Review Enforced</span>
           </div>
           <div id="actions-container" style="display: flex; flex-direction: column; gap: 10px;">
@@ -173,8 +175,8 @@
           </p>
 
           <div style="display: flex; gap: 10px; margin-top: 6px;">
-            <input type="text" id="outgoing-sig-input" placeholder="Outgoing Signature (Marcus Vance)" value="Marcus Vance" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem;">
-            <input type="text" id="incoming-sig-input" placeholder="Incoming Signature (Elena Rostova)" value="Elena Rostova" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem;">
+            <input type="text" id="outgoing-sig-input" placeholder="Outgoing User (Marcus Vance)" value="Marcus Vance" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem;">
+            <input type="text" id="incoming-sig-input" placeholder="Incoming User (Elena Rostova)" value="Elena Rostova" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); color: #fff; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem;">
             <button class="btn btn-success" onclick="submitHandoverSignoff()">Accept Handover</button>
           </div>
         </div>
@@ -196,14 +198,15 @@
         <!-- TAB 1: Benchmarking & Controlled Evaluation -->
         <div id="tab-benchmarking" class="tab-content active">
           <div style="display: flex; flex-direction: column; gap: 12px;">
-            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
-              Controlled Monte Carlo Evaluation (Seed=42)
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">Monte Carlo Evaluation</span>
+              <span class="freshness-badge badge-delayed">CONTROLLED SIMULATION</span>
             </div>
             <p style="font-size: 0.75rem; color: var(--text-muted);">
-              Reproducible simulation over 100 trials comparing Unstructured Baseline vs. Structured Workspace.
+              Controlled simulated evaluation using reproducible incident scenarios (seed=42, 100 trials).
             </p>
 
-            <button class="btn btn-primary" onclick="runBenchmark()">Run Monte Carlo Evaluation (100 Trials)</button>
+            <button class="btn btn-primary" onclick="runBenchmark()">Run Simulation (100 Trials)</button>
 
             <!-- Prominent Metric Box -->
             <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
@@ -249,11 +252,12 @@
         <!-- TAB 2: Resilience Experiment -->
         <div id="tab-resilience-exp" class="tab-content">
           <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
-              Source Outage Resilience Experiment
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">Resilience Experiment</span>
+              <span class="freshness-badge badge-delayed">CONTROLLED SIMULATION</span>
             </div>
             <p style="font-size: 0.75rem; color: var(--text-muted);">
-              Proves workspace utility remains operational across Conditions A, B, C, D.
+              Controlled simulated resilience experiment over 100 trials per condition (seed=42).
             </p>
             <div id="resilience-exp-container" style="display: flex; flex-direction: column; gap: 8px;">
               <!-- Rendered dynamically -->
@@ -316,13 +320,21 @@
         <!-- TAB 5: Stakeholder Validation -->
         <div id="tab-validation" class="tab-content">
           <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">
-              Observational Stakeholder Validation Workflow
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">Stakeholder Validation</span>
+              <span class="freshness-badge badge-fresh">OBSERVATIONAL / DEMO</span>
             </div>
+
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleValidationMode('NOT_TESTED')">Set NOT TESTED</button>
+              <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleValidationMode('DEMO_SAMPLE')">Load DEMO SAMPLE</button>
+            </div>
+
             <div id="validation-summary-box" style="background: var(--bg-surface-elevated); padding: 8px 10px; border-radius: 6px; font-size: 0.78rem;">
               Loading validation statistics...
             </div>
-            <div id="validation-tasks-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto;">
+
+            <div id="validation-tasks-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto;">
               <!-- Rendered dynamically -->
             </div>
           </div>
@@ -336,8 +348,8 @@
               <strong>Enterprise Core Identity Service:</strong> Handles authentication, OAuth2 token generation, and RBAC across 480 internal applications.
             </p>
             <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px;">
-              <div>🟢 <strong>IMPLEMENTED:</strong> Server-Side RBAC, SHA-256 Hash Chain Audit, 2-Person Dual Approvals, Real Snapshot State Rollback, Source Resilience Guards, Controlled Benchmark Engine.</div>
-              <div style="margin-top: 4px;">🟡 <strong>SIMULATED:</strong> Synthetic 5-source enterprise data streams, 480-app telemetry load, HashiCorp Vault KMS rotation signal.</div>
+              <div>🟢 <strong>IMPLEMENTED:</strong> Server-Side RBAC, SHA-256 Hash Chain Audit, 2-Person Dual Approvals, Real Snapshot State Rollback, Source Resilience Health Panel, Controlled Benchmark Engine.</div>
+              <div style="margin-top: 4px;">🟡 <strong>SIMULATED:</strong> Synthetic 5-source enterprise data streams, 480-app telemetry load, HashiCorp Vault KMS rotation signal, Scenario-level simulated operational state.</div>
             </div>
           </div>
         </div>

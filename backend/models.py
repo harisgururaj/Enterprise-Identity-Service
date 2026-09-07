@@ -2,7 +2,7 @@
 Data models for Enterprise Identity Service Shift-Handover Workspace.
 Defines schemas for Data Sources, Hypotheses, Evidence, Action Logs,
 Change Review, Hash-Chained Audit Trail, Benchmark Metrics, Resilience Experiments,
-and Stakeholder Validation Tasks.
+Demo User Identity, and Stakeholder Validation Tasks.
 """
 
 from enum import Enum
@@ -57,6 +57,18 @@ class UserRole(str, Enum):
     SRE_ENGINEER = "SRE / On-Call Specialist"
     INCIDENT_COMMANDER = "Incident Commander / Handover Lead"
     APP_DEVELOPER = "Enterprise App Developer / Stakeholder"
+
+
+class ValidationCategory(str, Enum):
+    NOT_TESTED = "NOT_TESTED"
+    DEMO_SAMPLE = "DEMO_SAMPLE"
+    OBSERVED_VALIDATION = "OBSERVED_VALIDATION"
+
+
+class AuthUserIdentity(BaseModel):
+    """Prototype Demo Authenticated User Identity Context."""
+    username: str
+    role: str
 
 
 # --- Data Source Models ---
@@ -244,7 +256,7 @@ class ShiftHandoverWorkspace(BaseModel):
 # --- Evaluation & Validation Models ---
 
 class BenchmarkResult(BaseModel):
-    scenario: str
+    evaluation_label: str = "Controlled simulated evaluation using reproducible incident scenarios"
     trials_count: int
     seed: int
     baseline_handover_delay_minutes: float
@@ -268,18 +280,41 @@ class ResilienceConditionResult(BaseModel):
     condition_id: str
     condition_name: str
     chat_state: FreshnessState
-    recovery_delay_minutes: float
+    trials_count: int
+    mean_recovery_delay_minutes: float
+    std_dev_minutes: float
     task_success_rate_percent: float
+    degradation_vs_fresh_minutes: float
     critical_evidence_available: bool
     status: str  # OPERATIONAL, DEGRADED
+
+
+class ResilienceExperimentSummary(BaseModel):
+    experiment_label: str = "Controlled Simulated Resilience Experiment"
+    seed: int
+    trials_per_condition: int
+    conditions: List[ResilienceConditionResult]
 
 
 class StakeholderValidationTask(BaseModel):
     task_id: str
     task_name: str
-    completed: bool
-    completion_time_sec: float
-    error_count: int
-    comments: str
-    role: str
-    timestamp: str
+    validation_status: ValidationCategory = ValidationCategory.NOT_TESTED
+    completed: bool = False
+    completion_time_sec: Optional[float] = None
+    error_count: int = 0
+    comments: str = ""
+    recorded_by_user: Optional[str] = None
+    recorded_by_role: Optional[str] = None
+    timestamp: Optional[str] = None
+
+
+class ValidationSummary(BaseModel):
+    total_tasks: int
+    not_tested_count: int
+    demo_sample_count: int
+    observed_validation_count: int
+    observed_completion_rate_percent: float
+    observed_avg_task_time_sec: float
+    observed_total_errors: int
+    most_difficult_task: str

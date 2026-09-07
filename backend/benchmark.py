@@ -1,6 +1,6 @@
 """
 Empirical Benchmark & Resilience Experiment Engine for Enterprise Identity Service Handover Evaluation.
-Executes controlled, reproducible Monte Carlo simulations (seed=42, 100+ trials)
+Executes controlled, reproducible Monte Carlo simulations (seed=42, 100+ trials per condition)
 comparing Unstructured Baseline vs Structured Shift-Handover Workspace on
 Recovery Context Loss Delay, MTTR, Diagnostic Rework Rate, and Source Outage Resilience.
 """
@@ -8,12 +8,14 @@ Recovery Context Loss Delay, MTTR, Diagnostic Rework Rate, and Source Outage Res
 import math
 import random
 from typing import Dict, Any, List
-from backend.models import BenchmarkResult, ResilienceConditionResult, FreshnessState
+from backend.models import (
+    BenchmarkResult, ResilienceConditionResult, ResilienceExperimentSummary, FreshnessState
+)
 
 
 def run_handover_benchmark(trials: int = 100, seed: int = 42) -> Dict[str, Any]:
     """
-    Executes a controlled simulated experiment over 100+ shift handovers.
+    Executes a controlled simulated evaluation over 100+ shift handovers.
     Evaluates Unstructured Baseline vs Structured Shift-Handover Workspace.
     """
     random.seed(seed)
@@ -74,12 +76,11 @@ def run_handover_benchmark(trials: int = 100, seed: int = 42) -> Dict[str, Any]:
         f"Structured Workspace Recovery Context Delay: {avg_solution_delay:.1f} ± {std_solution:.1f} min. "
         f"Measured delay reduction: {percentage_reduction:.1f}% ({delay_reduction:.1f} min saved) vs Target: {target_reduction:.1f}%. "
         f"Evaluation Result: {'PASS' if pass_target else 'FAIL'}. "
-        f"Diagnostic Rework Rate dropped from {avg_baseline_rework:.1f}% to {avg_solution_rework:.1f}%. "
-        f"Sensitivity analysis confirms persistent hypothesis-evidence linking preserves usability under partial source degradation."
+        f"Diagnostic Rework Rate dropped from {avg_baseline_rework:.1f}% to {avg_solution_rework:.1f}%."
     )
 
     result_model = BenchmarkResult(
-        scenario="Controlled simulated evaluation using reproducible incident scenarios",
+        evaluation_label="Controlled simulated evaluation using reproducible incident scenarios",
         trials_count=trials,
         seed=seed,
         baseline_handover_delay_minutes=round(avg_baseline_delay, 2),
@@ -102,48 +103,62 @@ def run_handover_benchmark(trials: int = 100, seed: int = 42) -> Dict[str, Any]:
     return result_model.model_dump()
 
 
-def run_resilience_experiment() -> List[Dict[str, Any]]:
+def run_resilience_experiment(trials_per_condition: int = 100, seed: int = 42) -> Dict[str, Any]:
     """
-    Executes controlled resilience experiment comparing system usability across
-    Condition A (all 5 sources FRESH), Condition B (Chat MISSING),
-    Condition C (Chat DELAYED), and Condition D (Chat STALE).
+    Executes a controlled simulated resilience experiment across 4 chat availability conditions.
+    Computes mean delay, standard deviation, and success rates over 100 trials per condition using a fixed seed.
     """
-    conditions = [
-        ResilienceConditionResult(
-            condition_id="COND-A",
-            condition_name="Condition A: All 5 Enterprise Sources Available",
-            chat_state=FreshnessState.FRESH,
-            recovery_delay_minutes=14.2,
-            task_success_rate_percent=100.0,
-            critical_evidence_available=True,
-            status="OPERATIONAL"
-        ),
-        ResilienceConditionResult(
-            condition_id="COND-B",
-            condition_name="Condition B: Slack Chat Stream MISSING",
-            chat_state=FreshnessState.MISSING,
-            recovery_delay_minutes=16.3,
-            task_success_rate_percent=95.0,
-            critical_evidence_available=True,
-            status="OPERATIONAL (Resilient Fallback)"
-        ),
-        ResilienceConditionResult(
-            condition_id="COND-C",
-            condition_name="Condition C: Slack Chat Stream DELAYED (15m)",
-            chat_state=FreshnessState.DELAYED,
-            recovery_delay_minutes=15.7,
-            task_success_rate_percent=98.0,
-            critical_evidence_available=True,
-            status="OPERATIONAL (Warning Banner)"
-        ),
-        ResilienceConditionResult(
-            condition_id="COND-D",
-            condition_name="Condition D: Slack Chat Stream STALE (> 30m)",
-            chat_state=FreshnessState.STALE,
-            recovery_delay_minutes=16.8,
-            task_success_rate_percent=92.0,
-            critical_evidence_available=True,
-            status="OPERATIONAL (Stale Alert)"
-        )
+    random.seed(seed)
+
+    condition_configs = [
+        ("COND-A", "Condition A: All 5 Enterprise Sources FRESH", FreshnessState.FRESH, 13.5, 1.8, 1.00),
+        ("COND-B", "Condition B: Slack Chat Stream MISSING", FreshnessState.MISSING, 16.2, 2.1, 0.95),
+        ("COND-C", "Condition C: Slack Chat Stream DELAYED (15m)", FreshnessState.DELAYED, 15.4, 1.9, 0.98),
+        ("COND-D", "Condition D: Slack Chat Stream STALE (> 30m)", FreshnessState.STALE, 16.6, 2.2, 0.92)
     ]
-    return [c.model_dump() for c in conditions]
+
+    fresh_mean = 0.0
+    results: List[ResilienceConditionResult] = []
+
+    for idx, (cid, name, state, base_mean, base_std, base_success_p) in enumerate(condition_configs):
+        delays: List[float] = []
+        successes: List[bool] = []
+
+        for _ in range(trials_per_condition):
+            d = max(8.0, random.normalvariate(base_mean, base_std))
+            succ = random.random() < base_success_p
+            delays.append(d)
+            successes.append(succ)
+
+        mean_d = sum(delays) / len(delays)
+        std_d = math.sqrt(sum((x - mean_d) ** 2 for x in delays) / trials_per_condition)
+        succ_rate = (sum(1 for s in successes if s) / trials_per_condition) * 100.0
+
+        if idx == 0:
+            fresh_mean = mean_d
+            deg = 0.0
+        else:
+            deg = mean_d - fresh_mean
+
+        results.append(
+            ResilienceConditionResult(
+                condition_id=cid,
+                condition_name=name,
+                chat_state=state,
+                trials_count=trials_per_condition,
+                mean_recovery_delay_minutes=round(mean_d, 2),
+                std_dev_minutes=round(std_d, 2),
+                task_success_rate_percent=round(succ_rate, 1),
+                degradation_vs_fresh_minutes=round(deg, 2),
+                critical_evidence_available=True,
+                status="OPERATIONAL" if state == FreshnessState.FRESH else "OPERATIONAL (Resilient Fallback)"
+            )
+        )
+
+    summary = ResilienceExperimentSummary(
+        experiment_label="Controlled Simulated Resilience Experiment",
+        seed=seed,
+        trials_per_condition=trials_per_condition,
+        conditions=results
+    )
+    return summary.model_dump()

@@ -1,14 +1,22 @@
 /**
  * JavaScript Controller for Enterprise Identity Service Shift-Handover Workspace
- * Enforces Server-Side RBAC via X-User-Role HTTP headers, renders Source Resilience Matrix,
- * Action State Snapshots, SHA-256 Hash Chain Audit verification, Benchmark Evaluation,
- * Resilience Experiments, and Observational Stakeholder Validation Workflows.
+ * Enforces Prototype Authentication Context via X-User-Role & X-User-Name HTTP headers,
+ * renders Source Resilience Matrix, Action State Snapshots, SHA-256 Hash Chain Audit verification,
+ * Benchmark Evaluation, Resilience Experiments, and Observational Stakeholder Validation Workflows.
  */
 
 let currentWorkspaceData = null;
 let activeRole = "SRE / On-Call Specialist";
+let activeUsername = "Elena Rostova";
 
 document.addEventListener("DOMContentLoaded", () => {
+  const usernameInput = document.getElementById("demo-username-input");
+  if (usernameInput) {
+    usernameInput.addEventListener("change", (e) => {
+      activeUsername = e.target.value || "Demo Evaluator";
+    });
+  }
+
   fetchWorkspaceData();
   runBenchmark();
   fetchResilienceExperiment();
@@ -16,10 +24,20 @@ document.addEventListener("DOMContentLoaded", () => {
   verifyAuditChain();
 });
 
+function getAuthHeaders() {
+  const nameInput = document.getElementById("demo-username-input");
+  const name = nameInput ? nameInput.value.strip() || activeUsername : activeUsername;
+  return {
+    "X-User-Role": activeRole,
+    "X-User-Name": name,
+    "Content-Type": "application/json"
+  };
+}
+
 async function fetchWorkspaceData() {
   try {
     const res = await fetch(`/api/workspace?role=${encodeURIComponent(activeRole)}`, {
-      headers: { "X-User-Role": activeRole }
+      headers: getAuthHeaders()
     });
     if (!res.ok) throw new Error("Failed to load workspace data");
     const data = await res.json();
@@ -31,10 +49,8 @@ async function fetchWorkspaceData() {
 }
 
 function renderWorkspace(data) {
-  // 1. Freshness Status Badges
   renderFreshness(data.freshness);
 
-  // 2. Banner Metadata
   document.getElementById("risk-score-display").innerText = `${data.context_loss_risk_score.toFixed(1)} / 100`;
   document.getElementById("outgoing-lead").innerText = data.outgoing_shift_lead;
   document.getElementById("incoming-lead").innerText = data.incoming_shift_lead;
@@ -46,19 +62,14 @@ function renderWorkspace(data) {
     document.getElementById("handover-status-badge").className = "freshness-badge badge-delayed";
   }
 
-  // 3. Operational Data Streams & Resilience Panel
   renderChatStream(data.raw_data_sources.chat_excerpts, data.freshness.chat_excerpts);
   renderMetricsStream(data.raw_data_sources.dashboard_metrics, data.freshness.dashboards);
   renderSourceResiliencePanel(data.source_resilience);
 
-  // 4. Center Column: Graph & Action Queue
   renderHypothesesGraph(data.hypotheses, data.evidence_list);
   renderActionsQueue(data.unresolved_actions, data.change_reviews);
 
-  // 5. Shift Summary
   document.getElementById("shift-summary-text").innerText = data.shift_summary;
-
-  // 6. Right Column: Audit Trail
   renderAuditTrail(data.audit_trail);
 }
 
@@ -344,7 +355,7 @@ async function triggerAuditTamperTest() {
   try {
     const res = await fetch("/api/audit/tamper-test", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ record_index: 0 })
     });
     if (res.ok) {
@@ -408,8 +419,8 @@ async function submitNewHypothesis() {
   try {
     const res = await fetch("/api/hypotheses", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
-      body: JSON.stringify({ title, description: desc, created_by: "Elena Rostova", confidence_score: 0.5 })
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ title, description: desc, confidence_score: 0.5 })
     });
     if (res.ok) {
       closeAddHypoModal();
@@ -424,8 +435,8 @@ async function approveChangeReview(actionId) {
   try {
     const res = await fetch("/api/change-review/approve", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
-      body: JSON.stringify({ action_id: actionId, approver: activeRole.includes("Incident") ? "Marcus Vance" : "Elena Rostova" })
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ action_id: actionId })
     });
     if (res.ok) {
       fetchWorkspaceData();
@@ -439,8 +450,8 @@ async function executeAction(actionId) {
   try {
     const res = await fetch("/api/actions/execute", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
-      body: JSON.stringify({ action_id: actionId, executed_by: "Elena Rostova" })
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ action_id: actionId })
     });
     if (res.ok) {
       fetchWorkspaceData();
@@ -455,8 +466,8 @@ async function triggerRollback(actionId) {
   try {
     const res = await fetch("/api/actions/rollback", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
-      body: JSON.stringify({ action_id: actionId, actor: "Elena Rostova", rationale: "1-Click Handover Rollback Trigger" })
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ action_id: actionId, rationale: "1-Click Handover Rollback Trigger" })
     });
     if (res.ok) {
       fetchWorkspaceData();
@@ -470,7 +481,7 @@ async function toggleSource(sourceName, state) {
   try {
     const res = await fetch("/api/data-sources/toggle", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ source_name: sourceName, state: state })
     });
     if (res.ok) {
@@ -487,8 +498,8 @@ async function submitHandoverSignoff() {
   try {
     const res = await fetch("/api/handover/signoff", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-User-Role": activeRole },
-      body: JSON.stringify({ outgoing_lead_signature: outSig, incoming_lead_signature: inSig })
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ outgoing_user: outSig, incoming_user: inSig })
     });
     if (res.ok) {
       fetchWorkspaceData();
@@ -520,20 +531,20 @@ async function runBenchmark() {
 
 async function fetchResilienceExperiment() {
   try {
-    const res = await fetch("/api/resilience-experiment");
+    const res = await fetch("/api/resilience-experiment?trials=100&seed=42");
     if (!res.ok) return;
-    const conditions = await res.json();
+    const summary = await res.json();
 
     const container = document.getElementById("resilience-exp-container");
     if (!container) return;
 
     let html = "";
-    conditions.forEach(cond => {
+    summary.conditions.forEach(cond => {
       html += `
         <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 8px 10px; border-radius: 6px; font-size: 0.78rem;">
           <div style="font-weight: 700; color: var(--text-primary);">${cond.condition_name}</div>
           <div style="display: flex; justify-content: space-between; color: var(--text-muted); margin-top: 4px;">
-            <span>Recovery Delay: <strong style="color: var(--accent-cyan);">${cond.recovery_delay_minutes} min</strong></span>
+            <span>Delay: <strong style="color: var(--accent-cyan);">${cond.mean_recovery_delay_minutes} ± ${cond.std_dev_minutes}m</strong></span>
             <span>Task Success: <strong style="color: #34d399;">${cond.task_success_rate_percent}%</strong></span>
           </div>
         </div>
@@ -552,9 +563,10 @@ async function fetchStakeholderValidation() {
     const summaryBox = document.getElementById("validation-summary-box");
     if (summaryBox) {
       summaryBox.innerHTML = `
-        <strong>Completion Rate:</strong> ${data.summary.task_completion_rate_percent}% | 
-        <strong>Avg Task Time:</strong> ${data.summary.average_task_time_sec}s | 
-        <strong>Total Errors:</strong> ${data.summary.total_error_count}
+        <strong>Observed Rate:</strong> ${data.summary.observed_completion_rate_percent}% | 
+        <strong>Avg Time:</strong> ${data.summary.observed_avg_task_time_sec}s | 
+        <strong>Not Tested:</strong> ${data.summary.not_tested_count} | 
+        <strong>Demo Samples:</strong> ${data.summary.demo_sample_count}
       `;
     }
 
@@ -563,17 +575,36 @@ async function fetchStakeholderValidation() {
 
     let html = "";
     data.tasks.forEach(t => {
+      const badgeClass = t.validation_status === "OBSERVED_VALIDATION" ? "badge-fresh" : t.validation_status === "DEMO_SAMPLE" ? "badge-delayed" : "badge-stale";
       html += `
         <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); padding: 8px 10px; border-radius: 6px; font-size: 0.75rem;">
           <div style="display: flex; justify-content: space-between; font-weight: 600;">
             <span style="color: var(--text-primary);">${t.task_id}: ${t.task_name}</span>
-            <span style="color: #34d399;">✓ ${t.completion_time_sec}s</span>
+            <span class="freshness-badge ${badgeClass}">${t.validation_status}</span>
           </div>
-          <div style="color: var(--text-muted); font-size: 0.7rem; margin-top: 2px;">Role: ${t.role} | Notes: ${t.comments}</div>
+          <div style="color: var(--text-muted); font-size: 0.7rem; margin-top: 4px;">
+            ${t.completed ? `✓ Completed in ${t.completion_time_sec}s | Errors: ${t.error_count}` : 'Not executed yet'}
+            ${t.comments ? `<br>Notes: ${t.comments}` : ''}
+          </div>
         </div>
       `;
     });
     container.innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+async function toggleValidationMode(mode) {
+  try {
+    const res = await fetch("/api/stakeholder-validation/demo-toggle", {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ mode: mode })
+    });
+    if (res.ok) {
+      fetchStakeholderValidation();
+    } else {
+      handleApiError(res);
+    }
   } catch (e) { console.error(e); }
 }
 
@@ -585,11 +616,14 @@ async function handleApiError(res) {
 
 async function resetScenario() {
   try {
-    const res = await fetch("/api/reset", { method: "POST", headers: { "X-User-Role": activeRole } });
+    const res = await fetch("/api/reset", { method: "POST", headers: getAuthHeaders() });
     if (res.ok) {
       fetchWorkspaceData();
       runBenchmark();
       verifyAuditChain();
+      fetchStakeholderValidation();
+    } else {
+      handleApiError(res);
     }
   } catch (e) { console.error(e); }
 }
