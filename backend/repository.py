@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
 from backend.database import init_db, SessionLocal
 from backend.db_models import (
@@ -30,6 +31,14 @@ from backend.models import (
 from backend.data_generator import GENESIS_HASH, compute_audit_hash
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+
+SOURCE_EXPLICIT_MAP = {
+    "incident_notes": "Incident Notes",
+    "chat_excerpts": "Slack Chat Stream",
+    "dashboards": "Datadog Telemetry",
+    "ownership_changes": "AWS IAM / Ownership Log",
+    "action_logs": "ServiceNow Action Log"
+}
 
 
 def load_fixture(filename: str) -> List[Dict[str, Any]]:
@@ -567,3 +576,499 @@ def get_raw_data_sources_db(db: Session) -> Dict[str, Any]:
         "ownership_changes": ownerships,
         "action_logs": actions
     }
+
+
+def toggle_source_freshness_db(db: Session, source_name: str, state: FreshnessState, actor: str, role: str) -> Dict[str, Any]:
+    """Toggles data source freshness state in SQLite DB and logs audit event."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    fresh_row = db.query(DBFreshnessStatus).filter(DBFreshnessStatus.id == 1).first()
+    if not fresh_row:
+        fresh_row = DBFreshnessStatus(id=1, last_checked=now)
+        db.add(fresh_row)
+
+    if hasattr(fresh_row, source_name):
+        setattr(fresh_row, source_name, state.value)
+        fresh_row.last_checked = now
+
+        target_display_name = SOURCE_EXPLICIT_MAP.get(source_name)
+        res_row = db.query(DBSourceResilienceItem).filter(DBSourceResilienceItem.source_name == target_display_name).first()
+        if res_row:
+            res_row.state = state.value
+            res_row.last_updated = now
+            if state == FreshnessState.FRESH:
+                res_row.usability = "FULL"
+                res_row.impact_assessment = "Source operational; evidence linking intact."
+            elif state == FreshnessState.DELAYED:
+                res_row.usability = "DEGRADED (15m lag)"
+                res_row.impact_assessment = "Data delayed; verify timestamps before executing changes."
+            elif state == FreshnessState.STALE:
+                res_row.usability = "STALE (>30m lag)"
+                res_row.impact_assessment = "Data stale; confidence scores adjusted downward."
+            elif state == FreshnessState.MISSING:
+                res_row.usability = "UNAVAILABLE"
+                res_row.impact_assessment = "Source offline. Workspace operating in resilient graph mode."
+
+        add_audit_entry_db(
+            db, actor=actor, role=role, action_type="DATA_SOURCE_CHANGED",
+            description=f"Toggled data source `{source_name}` status to `{state.value}`",
+            metadata={"source": source_name, "new_state": state.value}
+        )
+        db.commit()
+
+        updated_freshness = DataFreshnessStatus(
+            incident_notes=FreshnessState(fresh_row.incident_notes),
+            chat_excerpts=FreshnessState(fresh_row.chat_excerpts),
+            dashboards=FreshnessState(fresh_row.dashboards),
+            ownership_changes=FreshnessState(fresh_row.ownership_changes),
+            action_logs=FreshnessState(fresh_row.action_logs),
+            last_checked=fresh_row.last_checked
+        )
+        return {"status": "SUCCESS", "source": source_name, "new_state": state.value, "freshness": updated_freshness.model_dump()}
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown data source: {source_name}")
+
+
+def create_hypothesis_db(db: Session, title: str, description: str, confidence_score: float, actor: str, role: str) -> Dict[str, Any]:
+    """Creates a new hypothesis record in SQLite DB."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    count = db.query(DBHypothesis).count()
+    hypo_id = f"HYPO-{count + 1:02d}"
+
+    db_hypo = DBHypothesis(
+        id=hypo_id,
+        title=title,
+        description=description,
+        status="INVESTIGATING",
+        confidence_score=confidence_score,
+        created_by=actor,
+        created_at=now,
+        updated_at=now,
+        evidence_ids_json="[]"
+    )
+    db.add(db_hypo)
+
+    add_audit_entry_db(
+        db, actor=actor, role=role, action_type="HYPOTHESIS_CREATED",
+        description=f"Created hypothesis `{hypo_id}`: {title}",
+        metadata={"hypothesis_id": hypo_id}
+    )
+    db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "hypothesis": {
+            "id": hypo_id, "title": title, "description": description,
+            "status": "INVESTIGATING", "confidence_score": confidence_score,
+            "created_by": actor, "created_at": now, "updated_at": now, "evidence_ids": []
+        }
+    }
+
+
+def link_evidence_db(db: Session, hypothesis_id: str, source_type: SourceType, source_id: str, title: str, snippet: str, impact: EvidenceImpact, actor: str, role: str) -> Dict[str, Any]:
+    """Links an evidence item to a hypothesis in SQLite DB."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    hypo_db = db.query(DBHypothesis).filter(DBHypothesis.id == hypothesis_id).first()
+    if not hypo_db:
+        raise HTTPException(status_code=404, detail=f"Hypothesis '{hypothesis_id}' not found")
+
+    count = db.query(DBEvidence).count()
+    evid_id = f"EVID-{count + 1:02d}"
+
+    db_evid = DBEvidence(
+        id=evid_id,
+        hypothesis_id=hypothesis_id,
+        source_type=source_type.value,
+        source_id=source_id,
+        title=title,
+        snippet=snippet,
+        impact=impact.value,
+        added_by=actor,
+        added_at=now
+    )
+    db.add(db_evid)
+
+    evid_ids = json.loads(hypo_db.evidence_ids_json)
+    evid_ids.append(evid_id)
+    hypo_db.evidence_ids_json = json.dumps(evid_ids)
+
+    if impact == EvidenceImpact.SUPPORTS:
+        hypo_db.confidence_score = min(0.99, hypo_db.confidence_score + 0.15)
+    elif impact == EvidenceImpact.REFUTES:
+        hypo_db.confidence_score = max(0.01, hypo_db.confidence_score - 0.25)
+        if hypo_db.confidence_score < 0.1:
+            hypo_db.status = "DISPROVED"
+
+    hypo_db.updated_at = now
+
+    add_audit_entry_db(
+        db, actor=actor, role=role, action_type="EVIDENCE_LINKED",
+        description=f"Linked evidence `{evid_id}` to Hypothesis `{hypothesis_id}` ({impact.value})",
+        metadata={"evidence_id": evid_id, "hypothesis_id": hypothesis_id, "source_id": source_id}
+    )
+    db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "evidence": {
+            "id": evid_id, "hypothesis_id": hypothesis_id, "source_type": source_type.value,
+            "source_id": source_id, "title": title, "snippet": snippet, "impact": impact.value,
+            "added_by": actor, "added_at": now
+        },
+        "updated_hypothesis": {
+            "id": hypo_db.id, "title": hypo_db.title, "description": hypo_db.description,
+            "status": hypo_db.status, "confidence_score": hypo_db.confidence_score,
+            "created_by": hypo_db.created_by, "created_at": hypo_db.created_at,
+            "updated_at": hypo_db.updated_at, "evidence_ids": json.loads(hypo_db.evidence_ids_json)
+        }
+    }
+
+
+def approve_change_review_db(db: Session, action_id: str, actor: str, role: str) -> Dict[str, Any]:
+    """Applies two-person dual approval state machine to DB records."""
+    req_db = db.query(DBChangeReviewRequest).filter(DBChangeReviewRequest.action_id == action_id).first()
+    if not req_db:
+        raise HTTPException(status_code=404, detail=f"Change review request for action '{action_id}' not found")
+
+    if req_db.approver_1 and req_db.approver_1.lower() == actor.lower():
+        raise HTTPException(status_code=400, detail=f"Dual Approval Failure: User '{actor}' has already provided Approval 1. Approval 2 requires a distinct second user.")
+
+    if not req_db.approver_1:
+        req_db.approver_1 = actor
+        req_db.status = "PENDING_APPROVAL_2"
+    else:
+        req_db.approver_2 = actor
+        req_db.approved_by = f"{req_db.approver_1} & {req_db.approver_2}"
+        req_db.status = "APPROVED"
+
+    act_db = db.query(DBActionLog).filter(DBActionLog.id == action_id).first()
+    if act_db:
+        act_db.approver_1 = req_db.approver_1
+        act_db.approver_2 = req_db.approver_2
+        act_db.approved_by = req_db.approved_by
+        if req_db.status == "APPROVED":
+            act_db.status = "APPROVED"
+
+    add_audit_entry_db(
+        db, actor=actor, role=role, action_type="CHANGE_REVIEW_APPROVED",
+        description=f"Approved change review step for action `{action_id}` ({req_db.status})",
+        metadata={"action_id": action_id, "approver": actor, "review_status": req_db.status}
+    )
+    db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "change_review": {
+            "action_id": req_db.action_id, "action_name": req_db.action_name,
+            "requested_by": req_db.requested_by, "target_component": req_db.target_component,
+            "impact_level": req_db.impact_level, "justification": req_db.justification,
+            "proposed_at": req_db.proposed_at, "approved_by": req_db.approved_by,
+            "approver_1": req_db.approver_1, "approver_2": req_db.approver_2, "status": req_db.status
+        }
+    }
+
+
+def execute_action_db(db: Session, action_id: str, actor: str, role: str) -> Dict[str, Any]:
+    """Executes action in DB, capturing dynamic before_state snapshot and applying after_state."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    act_db = db.query(DBActionLog).filter(DBActionLog.id == action_id).first()
+    if not act_db:
+        raise HTTPException(status_code=404, detail=f"Action '{action_id}' not found")
+
+    if act_db.status == "EXECUTED":
+        raise HTTPException(status_code=400, detail=f"Action '{action_id}' has already been executed")
+
+    if act_db.requires_two_person_review and act_db.status != "APPROVED":
+        add_audit_entry_db(
+            db, actor=actor, role=role, action_type="UNAUTHORIZED_ACTION_ATTEMPT",
+            description=f"Blocked unapproved execution attempt for action `{action_id}`",
+            metadata={"action_id": action_id}
+        )
+        raise HTTPException(status_code=403, detail="Forbidden: High-impact action requires complete 2-person approval before execution")
+
+    # Capture before_state dynamically from DB dashboard metrics
+    metrics_db = db.query(DBDashboardMetric).all()
+    before_state = {}
+    for m in metrics_db:
+        if m.id == "METRIC-AUTH-02":
+            before_state["jwt_error_rate_percent"] = m.current_value
+        elif m.id == "METRIC-AUTH-03":
+            before_state["stale_cache_ratio_percent"] = m.current_value
+
+    after_state = {"jwt_error_rate_percent": 0.02, "stale_cache_ratio_percent": 0.0}
+
+    act_db.before_state_json = json.dumps(before_state)
+    act_db.after_state_json = json.dumps(after_state)
+    act_db.status = "EXECUTED"
+    act_db.executed_at = now
+
+    # Apply after_state to metrics in DB
+    for m in metrics_db:
+        if m.id == "METRIC-AUTH-02":
+            m.current_value = after_state["jwt_error_rate_percent"]
+            m.status = "NORMAL"
+            m.trend = "FALLING"
+        elif m.id == "METRIC-AUTH-03":
+            m.current_value = after_state["stale_cache_ratio_percent"]
+            m.status = "NORMAL"
+            m.trend = "FALLING"
+
+    ws_db = db.query(DBIncidentWorkspace).filter(DBIncidentWorkspace.id == "INC-9042").first()
+    if ws_db:
+        ws_db.context_loss_risk_score = 2.1
+        ws_db.shift_summary += " [EXECUTION SUCCESS: API Edge Gateway cache flushed. JWT error rate reduced to 0.02%. Incident resolved.]"
+
+    add_audit_entry_db(
+        db, actor=actor, role=role, action_type="ACTION_EXECUTED",
+        description=f"Executed action `{action_id}`: {act_db.action_name}",
+        metadata={"action_id": action_id, "before_state": before_state, "after_state": after_state}
+    )
+    db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "action": {
+            "id": act_db.id, "action_name": act_db.action_name, "status": act_db.status,
+            "executed_at": act_db.executed_at, "before_state": before_state, "after_state": after_state
+        },
+        "workspace_risk_score": 2.1
+    }
+
+
+def rollback_action_db(db: Session, action_id: str, rationale: str, actor: str, role: str) -> Dict[str, Any]:
+    """Rolls back action in DB, reading before_state snapshot and physically restoring system metrics."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    act_db = db.query(DBActionLog).filter(DBActionLog.id == action_id).first()
+    if not act_db:
+        raise HTTPException(status_code=404, detail=f"Action log entry '{action_id}' not found")
+
+    if not act_db.is_reversible:
+        raise HTTPException(status_code=400, detail=f"Action '{action_id}' is marked NON-REVERSIBLE and cannot be rolled back")
+
+    if act_db.status == "ROLLED_BACK":
+        raise HTTPException(status_code=400, detail=f"Action '{action_id}' has already been rolled back")
+
+    if act_db.status != "EXECUTED":
+        raise HTTPException(status_code=400, detail=f"Cannot rollback action '{action_id}' because it has not been executed yet (Current Status: {act_db.status})")
+
+    before_state = json.loads(act_db.before_state_json)
+
+    act_db.status = "ROLLED_BACK"
+    act_db.rollback_executed_at = now
+    act_db.rollback_by = actor
+    act_db.rollback_reason = rationale
+    act_db.rollback_state_json = json.dumps(before_state)
+
+    # Restore metric values from before_state snapshot
+    restored_err = before_state.get("jwt_error_rate_percent", 18.6)
+    restored_stale = before_state.get("stale_cache_ratio_percent", 42.5)
+
+    metrics_db = db.query(DBDashboardMetric).all()
+    for m in metrics_db:
+        if m.id == "METRIC-AUTH-02":
+            m.current_value = restored_err
+            m.status = "CRITICAL" if restored_err > 5.0 else "NORMAL"
+            m.trend = "RISING"
+        elif m.id == "METRIC-AUTH-03":
+            m.current_value = restored_stale
+            m.status = "CRITICAL" if restored_stale > 1.0 else "NORMAL"
+            m.trend = "HIGH_STABLE"
+
+    ws_db = db.query(DBIncidentWorkspace).filter(DBIncidentWorkspace.id == "INC-9042").first()
+    if ws_db:
+        ws_db.context_loss_risk_score = 12.4
+
+    add_audit_entry_db(
+        db, actor=actor, role=role, action_type="ACTION_ROLLED_BACK",
+        description=f"Executed rollback for action `{action_id}` ({act_db.action_name}). Rationale: {rationale}",
+        metadata={"action_id": action_id, "restored_state": before_state, "rationale": rationale}
+    )
+    db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "action": {
+            "id": act_db.id, "action_name": act_db.action_name, "status": act_db.status,
+            "rollback_executed_at": act_db.rollback_executed_at, "rollback_by": act_db.rollback_by,
+            "rollback_reason": act_db.rollback_reason, "restored_state": before_state
+        }
+    }
+
+
+def verify_audit_trail_db(db: Session) -> AuditVerificationResult:
+    """Verifies SHA-256 hash chain integrity of audit records in SQLite database."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    audit_rows = db.query(DBAuditEntry).order_by(DBAuditEntry.id.asc()).all()
+
+    if not audit_rows:
+        return AuditVerificationResult(valid=True, records_checked=0, first_invalid_record=None, timestamp=now)
+
+    prev_hash = GENESIS_HASH
+    for idx, entry in enumerate(audit_rows):
+        computed = compute_audit_hash(
+            entry.id, entry.timestamp, entry.actor, entry.role,
+            entry.action_type, entry.description, json.loads(entry.metadata_json), entry.previous_hash
+        )
+        if entry.previous_hash != prev_hash or entry.record_hash != computed:
+            return AuditVerificationResult(
+                valid=False,
+                records_checked=idx + 1,
+                first_invalid_record=entry.id,
+                timestamp=now
+            )
+        prev_hash = entry.record_hash
+
+    return AuditVerificationResult(
+        valid=True,
+        records_checked=len(audit_rows),
+        first_invalid_record=None,
+        timestamp=now
+    )
+
+
+def tamper_test_db(db: Session, record_index: int, actor: str, role: str) -> Dict[str, Any]:
+    """Tampers with an audit record in SQLite DB to demonstrate tamper detection."""
+    audit_rows = db.query(DBAuditEntry).order_by(DBAuditEntry.id.asc()).all()
+    if not audit_rows or record_index >= len(audit_rows):
+        raise HTTPException(status_code=400, detail="Invalid audit record index")
+
+    target_entry = audit_rows[record_index]
+    target_entry.description += " [TAMPERED BY TEST ENGINE]"
+    db.commit()
+
+    return {"status": "SUCCESS", "message": f"Tampered DB record index {record_index} (ID: {target_entry.id})"}
+
+
+def signoff_handover_db(db: Session, outgoing_user: str, incoming_user: str, notes: str, actor: str, role: str) -> Dict[str, Any]:
+    """Updates formal shift handover signoff in SQLite DB."""
+    out_clean = outgoing_user.strip()
+    in_clean = incoming_user.strip()
+
+    if not out_clean or not in_clean:
+        raise HTTPException(status_code=400, detail="Handover Sign-off Error: Both outgoing and incoming shift lead identities are required")
+
+    if out_clean.lower() == in_clean.lower():
+        raise HTTPException(status_code=400, detail=f"Handover Sign-off Error: Outgoing user '{out_clean}' and Incoming user '{in_clean}' cannot be identical")
+
+    ws_db = db.query(DBIncidentWorkspace).filter(DBIncidentWorkspace.id == "INC-9042").first()
+    if ws_db:
+        ws_db.outgoing_shift_lead = out_clean
+        ws_db.incoming_shift_lead = in_clean
+        ws_db.handover_status = "ACCEPTED"
+
+    add_audit_entry_db(
+        db, actor=actor, role=role, action_type="HANDOVER_ACCEPTED",
+        description=f"Formal Shift Handover ACCEPTED between Outgoing: '{out_clean}' and Incoming: '{in_clean}'.",
+        metadata={"outgoing_user": out_clean, "incoming_user": in_clean, "notes": notes}
+    )
+    db.commit()
+
+    return {"status": "SUCCESS", "handover_status": "ACCEPTED", "outgoing_user": out_clean, "incoming_user": in_clean}
+
+
+def get_stakeholder_validation_db(db: Session) -> Dict[str, Any]:
+    """Retrieves stakeholder tasks and summary statistics from SQLite DB."""
+    tasks_db = db.query(DBStakeholderTask).all()
+    tasks: List[Dict[str, Any]] = []
+
+    for t in tasks_db:
+        tasks.append({
+            "task_id": t.task_id,
+            "task_name": t.task_name,
+            "validation_status": t.validation_status,
+            "completed": t.completed,
+            "completion_time_sec": t.completion_time_sec,
+            "error_count": t.error_count,
+            "comments": t.comments,
+            "recorded_by_user": t.recorded_by_user,
+            "recorded_by_role": t.recorded_by_role,
+            "timestamp": t.timestamp
+        })
+
+    observed = [t for t in tasks_db if t.validation_status == ValidationCategory.OBSERVED_VALIDATION.value and t.completed]
+    avg_time = sum(t.completion_time_sec for t in observed if t.completion_time_sec) / len(observed) if observed else 0.0
+    total_errors = sum(t.error_count for t in observed)
+
+    not_tested = sum(1 for t in tasks_db if t.validation_status == ValidationCategory.NOT_TESTED.value)
+    demo_sample = sum(1 for t in tasks_db if t.validation_status == ValidationCategory.DEMO_SAMPLE.value)
+
+    summary = ValidationSummary(
+        total_tasks=len(tasks_db),
+        not_tested_count=not_tested,
+        demo_sample_count=demo_sample,
+        observed_validation_count=len(observed),
+        observed_completion_rate_percent=round((len(observed) / len(tasks_db)) * 100.0, 1) if tasks_db else 0.0,
+        observed_avg_task_time_sec=round(avg_time, 1),
+        observed_total_errors=total_errors,
+        most_difficult_task="TASK-03 (Finding supporting evidence snippet)"
+    )
+
+    return {"tasks": tasks, "summary": summary.model_dump()}
+
+
+def record_stakeholder_task_db(db: Session, task_id: str, completed: bool, completion_time_sec: Optional[float], error_count: int, comments: str, validation_status: ValidationCategory, actor: str, role: str) -> Dict[str, Any]:
+    """Records an observational stakeholder validation task in SQLite DB."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    task_db = db.query(DBStakeholderTask).filter(DBStakeholderTask.task_id == task_id).first()
+    if not task_db:
+        raise HTTPException(status_code=404, detail=f"Validation task '{task_id}' not found")
+
+    task_db.validation_status = validation_status.value
+    task_db.completed = completed
+    task_db.completion_time_sec = completion_time_sec
+    task_db.error_count = error_count
+    task_db.comments = comments
+    task_db.recorded_by_user = actor
+    task_db.recorded_by_role = role
+    task_db.timestamp = now
+
+    add_audit_entry_db(
+        db, actor=actor, role=role, action_type="STAKEHOLDER_VALIDATION_RECORDED",
+        description=f"Recorded stakeholder validation task `{task_id}` status: {validation_status.value}",
+        metadata={"task_id": task_id, "validation_status": validation_status.value}
+    )
+    db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "task": {
+            "task_id": task_db.task_id, "task_name": task_db.task_name,
+            "validation_status": task_db.validation_status, "completed": task_db.completed,
+            "completion_time_sec": task_db.completion_time_sec, "error_count": task_db.error_count,
+            "comments": task_db.comments, "recorded_by_user": task_db.recorded_by_user,
+            "recorded_by_role": task_db.recorded_by_role, "timestamp": task_db.timestamp
+        }
+    }
+
+
+def toggle_stakeholder_demo_db(db: Session, mode: str) -> Dict[str, Any]:
+    """Toggles stakeholder tasks between NOT_TESTED and DEMO_SAMPLE in SQLite DB."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    tasks_db = db.query(DBStakeholderTask).all()
+
+    for t in tasks_db:
+        if mode == "DEMO_SAMPLE":
+            t.validation_status = "DEMO_SAMPLE"
+            t.completed = True
+            t.completion_time_sec = 15.0
+            t.error_count = 0
+            t.comments = "Illustrative Demo Sample Data — Not Actual User Study Results"
+            t.recorded_by_user = "Demo Evaluator"
+            t.recorded_by_role = "Enterprise App Developer / Stakeholder"
+            t.timestamp = now
+        else:
+            t.validation_status = "NOT_TESTED"
+            t.completed = False
+            t.completion_time_sec = None
+            t.error_count = 0
+            t.comments = ""
+            t.recorded_by_user = None
+            t.recorded_by_role = None
+            t.timestamp = None
+
+    db.commit()
+    return get_stakeholder_validation_db(db)

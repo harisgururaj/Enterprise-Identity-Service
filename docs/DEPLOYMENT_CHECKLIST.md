@@ -2,8 +2,10 @@
 
 ## Pre-Deployment Verification
 - [x] Python 3.10+ runtime verified.
-- [x] Complete dependencies listed in `requirements.txt`.
-- [x] Automated test suite execution: `python -m pytest tests/test_backend.py -v` (8/8 PASSED).
+- [x] Complete dependencies listed in `requirements.txt` (FastAPI, SQLAlchemy, Pydantic, Pytest, Uvicorn, Httpx).
+- [x] SQLite database schema initialized (`identity_workspace.db`).
+- [x] Database health and readiness endpoints operational (`GET /health`, `GET /health/ready`).
+- [x] Automated test suite execution: `python -m pytest tests/test_backend.py -v` (19/19 PASSED).
 
 ## Deployment Procedure
 1. **Navigate to Project Directory**:
@@ -24,4 +26,5 @@
    ```
 5. **Verify Live Application**:
    - Web App UI: `http://localhost:8000`
+   - Readiness Check: `GET http://localhost:8000/health/ready` returns `{"status": "READY", "database": "CONNECTED"}`.
    - API Verification: `GET http://localhost:8000/api/audit/verify` returns `valid: true`.

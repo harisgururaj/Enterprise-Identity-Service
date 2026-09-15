@@ -2,8 +2,9 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-green.svg)](https://fastapi.tiangolo.com/)
+[![SQLite](https://img.shields.io/badge/Database-SQLite%2FSQLAlchemy-lightgrey.svg)](https://www.sqlite.org/)
+[![Pytest Passed](https://img.shields.io/badge/Tests-19%2F19%20PASSED-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Pytest Passed](https://img.shields.io/badge/Tests-15%2F15%20PASSED-brightgreen.svg)]()
 
 > **From Operational Pain to Working Product**: An internal identity service used by every application in a large enterprise. During operational incidents, shift handovers lose context between outgoing and incoming engineers, causing repeated diagnostics, delayed recovery, unresolved actions, and increased MTTR.
 
@@ -15,22 +16,22 @@
 3. [System Architecture & Documentation Links](#-system-architecture--documentation-links)
 4. [Technology Stack & Folder Structure](#-technology-stack--folder-structure)
 5. [Quickstart & Installation](#-quickstart--installation)
-6. [Server-Side RBAC & Demo Authentication Context](#-server-side-rbac--demo-authentication-context)
-7. [Cryptographic SHA-256 Hash-Chained Audit Trail](#-cryptographic-sha-256-hash-chained-audit-trail)
-8. [Generic State Snapshot Rollback Engine](#-generic-state-snapshot-rollback-engine)
-9. [Controlled Benchmark & Resilience Experiments](#-controlled-benchmark--resilience-experiments)
-10. [Honest Stakeholder Validation Protocol](#-honest-stakeholder-validation-protocol)
-11. [Feature Honesty & Status Matrix](#-feature-honesty--status-matrix)
-12. [Traceability Matrix & Evaluation](#-traceability-matrix--evaluation)
+6. [SQLite Database Persistence & Fixture Ingestion](#-sqlite-database-persistence--fixture-ingestion)
+7. [AuthProvider Abstraction & Server-Side RBAC](#-authprovider-abstraction--server-side-rbac)
+8. [Cryptographic SHA-256 Hash-Chained Audit Trail](#-cryptographic-sha-256-hash-chained-audit-trail)
+9. [Generic State Snapshot Rollback Engine](#-generic-state-snapshot-rollback-engine)
+10. [Controlled Benchmark & Resilience Experiments](#-controlled-benchmark--resilience-experiments)
+11. [Honest Stakeholder Validation Protocol](#-honest-stakeholder-validation-protocol)
+12. [Feature Honesty & Status Matrix](#-feature-honesty--status-matrix)
 
 ---
 
 ## 🎯 Project Overview
 
-This project provides an **end-to-end, resilient working prototype** for a **Structured Shift-Handover Workspace**. Operating over a mission-critical **Enterprise Core Identity Service** (handling OAuth2/OIDC token generation and RBAC for 480+ enterprise applications), it carries hypotheses, empirical evidence, unresolved actions, and change approvals across shift transitions.
+This project provides an **end-to-end, resilient working prototype** for a **Structured Shift-Handover Workspace**. Operating over a mission-critical **Enterprise Core Identity Service** (handling OAuth2/OIDC token generation and RBAC for 480+ enterprise applications), it carries hypotheses, empirical evidence, unresolved actions, and change approvals across shift transitions with full SQLite database persistence and durable audit logging.
 
 ```
-INCIDENT ➔ DATA SOURCES ➔ HYPOTHESES ➔ EVIDENCE ➔ UNRESOLVED ACTIONS ➔ CHANGE REVIEW ➔ APPROVAL ➔ EXECUTION ➔ ROLLBACK ➔ HANDOVER SIGN-OFF ➔ AUDIT VERIFICATION ➔ BENCHMARK
+INCIDENT ➔ SYNTHETIC FIXTURES ➔ SQLITE DB ➔ HYPOTHESES ➔ EVIDENCE ➔ UNRESOLVED ACTIONS ➔ CHANGE REVIEW ➔ APPROVAL ➔ EXECUTION ➔ ROLLBACK ➔ HANDOVER SIGN-OFF ➔ SHA-256 AUDIT ➔ BENCHMARK
 ```
 
 ---
@@ -42,7 +43,7 @@ Large enterprise identity services process tens of thousands of authentication r
 
 ### SEV-1 Incident Scenario
 - **Trigger**: Automated Vault key rotation rotated identity signing key from `v3.9` ➔ `v4.1` at 07:00 UTC.
-- **Failure Cascade**: 42.5% of API Edge Gateways missed the cache invalidation webhook broadcast due to listener timeouts, causing a **18.6% JWT signature validation error spike (HTTP 401)** across downstream enterprise applications.
+- **Failure Cascade**: 42.5% of API Edge Gateways missed the cache invalidation webhook broadcast due to listener timeouts, causing an **18.6% JWT signature validation error spike (HTTP 401)** across downstream enterprise applications.
 - **Handover Window**: Shift Alpha (Lead: Marcus Vance) hands over to Shift Beta (Lead: Elena Rostova) at 09:30 UTC.
 
 ---
@@ -65,23 +66,33 @@ Detailed design specifications are located in the `docs/` folder:
 
 ## 🛠️ Technology Stack & Folder Structure
 
-- **Backend**: Python 3.10+, FastAPI, Pydantic v2, Pytest, Uvicorn, SHA-256 Hash Chaining
+- **Backend**: Python 3.10+, FastAPI, SQLAlchemy, SQLite Database Persistence, Pydantic v2, Pytest, Uvicorn
+- **Database**: SQLite (`identity_workspace.db`) supporting `DATABASE_URL` environment override
 - **Frontend**: Responsive Single-Page Application, Vanilla JavaScript, Modern CSS3 Glassmorphism System
-- **Testing**: Pytest Automated Integration & Security Suite (12/12 passing)
+- **Testing**: Pytest Automated Integration, Persistence, & Security Suite (19/19 PASSED)
 
 ```
 identity_shift_handover_workspace/
 ├── backend/
-│   ├── app.py                 # FastAPI server & RBAC authorization engine
+│   ├── app.py                 # FastAPI server, AuthProvider, health/readiness endpoints
+│   ├── database.py            # SQLAlchemy engine & session factory
+│   ├── db_models.py           # SQLAlchemy ORM database table schemas
+│   ├── repository.py          # Data Access Layer & DB fixture seed engine
 │   ├── models.py              # Pydantic schemas & state models
-│   ├── data_generator.py      # Scenario data & SHA-256 audit generator
+│   ├── data_generator.py      # Canonical SHA-256 audit hash calculator
 │   └── benchmark.py           # Controlled Monte Carlo benchmark engine
+├── data/                      # 5 Synthetic Enterprise JSON Fixtures
+│   ├── incident_notes.json
+│   ├── slack_chat.json
+│   ├── datadog_metrics.json
+│   ├── ownership_changes.json
+│   └── servicenow_actions.json
 ├── frontend/
 │   ├── index.html             # Responsive workspace web UI
 │   ├── css/style.css          # Glassmorphism design system
-│   └── js/app.js              # Client JS controller & RBAC header client
+│   └── js/app.js              # Client JS controller
 ├── tests/
-│   └── test_backend.py        # Pytest integration & security suite (12/12 PASSED)
+│   └── test_backend.py        # Pytest integration & security suite (19/19 PASSED)
 ├── docs/                      # Comprehensive technical documentation suite
 ├── requirements.txt           # Python dependencies
 └── run.py                     # Main python launcher script
@@ -102,7 +113,7 @@ cd identity_shift_handover_workspace
 # Install requirements
 pip install -r requirements.txt
 
-# Run automated test suite
+# Run automated test suite (19 tests)
 python -m pytest tests/test_backend.py -v
 ```
 
@@ -114,9 +125,22 @@ Open your browser to **http://localhost:8000** (or **http://127.0.0.1:8000**).
 
 ---
 
-## 🔐 Server-Side RBAC & Demo Authentication Context
+## 💾 SQLite Database Persistence & Fixture Ingestion
 
-Authorization is strictly enforced server-side via `X-User-Name` and `X-User-Role` HTTP headers on FastAPI endpoints.
+The application uses **SQLAlchemy ORM** and an **SQLite database** (`identity_workspace.db`) to ensure durable state retention:
+- **Persistence Across Restarts**: Workspace state, hypotheses, evidence, change approvals, and SHA-256 audit entries survive process restarts.
+- **Health & Readiness Endpoints**:
+  - `GET /health`: Returns service status and timestamp (`HTTP 200`).
+  - `GET /health/ready`: Performs `SELECT 1` query against SQLite database to verify database connectivity (`HTTP 200` / `503`).
+- **Fixture Ingestion**:
+  - `POST /api/fixtures/ingest`: Re-ingests 5 synthetic JSON fixtures from `data/` directory into database tables.
+
+---
+
+## 🔐 AuthProvider Abstraction & Server-Side RBAC
+
+Authentication architecture uses the **`AuthProviderInterface`** pattern to cleanly decouple prototype HTTP headers (`HeaderAuthProvider`) from production OAuth2/OIDC SSO providers.
+Authorization is strictly enforced server-side via `X-User-Name` and `X-User-Role` HTTP headers on FastAPI endpoints:
 - Missing role header returns **`HTTP 401 Unauthorized`** (never defaults to SRE).
 - Request-body actor overrides (`actor`, `executed_by`, `approver`) are explicitly ignored for authorization to prevent user impersonation.
 
@@ -137,16 +161,17 @@ Every audit record calculates a canonical SHA-256 hash incorporating its metadat
 
 $$\text{record\_hash} = \text{SHA256}(\text{id} \parallel \text{timestamp} \parallel \text{actor} \parallel \text{role} \parallel \text{action\_type} \parallel \text{description} \parallel \text{metadata} \parallel \text{previous\_hash})$$
 
-- **Verification Endpoint**: `GET /api/audit/verify` checks complete hash chain integrity.
+- **Durable Audit Table**: Audit entries are persisted in the `audit_trail` table in SQLite.
+- **Verification Endpoint**: `GET /api/audit/verify` checks complete hash chain integrity across all records.
 - **Tampering Detection Test**: `POST /api/audit/tamper-test` alters an audit record field to demonstrate tamper detection.
 
 ---
 
 ## 🔄 Generic State Snapshot Rollback Engine
 
-Unlike simple status tag updates, reversible actions capture explicit state snapshots:
+Reversible actions capture explicit state snapshots stored in SQLite:
 - `before_state`: Pre-execution telemetry values (JWT Error Rate: 18.6%, Stale Cache: 42.5%)
-- `after_state`: Post-execution values (JWT Error Rate: 0.8%, Stale Cache: 0.0%)
+- `after_state`: Post-execution values (JWT Error Rate: 0.02%, Stale Cache: 0.0%)
 - `rollback_state`: Restored state values
 
 Executing `POST /api/actions/rollback` **physically restores** simulated metric error rates back to 18.6% using the captured `before_state` snapshot.
@@ -167,11 +192,22 @@ Executing `POST /api/actions/rollback` **physically restores** simulated metric 
 | **Diagnostic Rework Rate** | 68.8% | **8.76%** | **87.27% Reduction** | — | **PASS** |
 | **95% Confidence Interval** | — | — | **[25.68 min, 30.02 min]** | — | **PASS** |
 
+### Resilience Experiment (8 Availability Conditions)
+Evaluates workspace recovery delay across 8 explicit data-source conditions:
+1. `ALL_FRESH` (Full graph)
+2. `CHAT_MISSING` (Chat stream offline)
+3. `METRICS_DELAYED` (15m telemetry lag)
+4. `METRICS_STALE` (>30m telemetry lag)
+5. `NOTES_MISSING` (Incident notes offline)
+6. `OWNERSHIP_MISSING` (IAM log offline)
+7. `ACTIONS_MISSING` (Action log offline)
+8. `DEGRADED_MULTI_SOURCE` (Multiple sources degraded)
+
 ---
 
 ## 👥 Honest Stakeholder Validation Protocol
 
-All validation tasks default to **`NOT_TESTED`**. Summary statistics compute **exclusively** from recorded **`OBSERVED_VALIDATION`** records.
+All validation tasks default to **`NOT_TESTED`**. Summary statistics compute **exclusively** from recorded **`OBSERVED_VALIDATION`** records. No fake user study metrics are presented.
 
 ---
 
@@ -179,6 +215,9 @@ All validation tasks default to **`NOT_TESTED`**. Summary statistics compute **e
 
 | Feature / Integration | Status | Description |
 | :--- | :---: | :--- |
+| **SQLite DB Persistence** | 🟢 **IMPLEMENTED** | SQLAlchemy DB persistence for workspace, evidence, approvals, audit log. |
+| **Health / Readiness Endpoints** | 🟢 **IMPLEMENTED** | `GET /health` and `GET /health/ready` database ping. |
+| **AuthProvider Abstraction** | 🟢 **IMPLEMENTED** | Clean `AuthProviderInterface` separating prototype headers from OAuth2/OIDC. |
 | **Structured Shift Workspace** | 🟢 **IMPLEMENTED** | Hypothesis-evidence graph, unresolved actions queue, sign-off wizard. |
 | **Server-Side RBAC** | 🟢 **IMPLEMENTED** | `X-User-Role` HTTP header permission enforcement returning 403 Forbidden. |
 | **SHA-256 Hash Chain Audit** | 🟢 **IMPLEMENTED** | Canonical SHA-256 hash chaining with `/api/audit/verify` verification API. |
@@ -186,7 +225,7 @@ All validation tasks default to **`NOT_TESTED`**. Summary statistics compute **e
 | **Generic State Snapshot Rollback** | 🟢 **IMPLEMENTED** | `before_state`/`after_state` capture and physical metric state restoration. |
 | **Source Resilience Matrix** | 🟢 **IMPLEMENTED** | Resilience health panel showing usability and safety guidance under outages. |
 | **Controlled Benchmark Engine** | 🟢 **IMPLEMENTED** | Monte Carlo simulation (`seed=42`, 100 trials, 95% CI) comparing baseline vs workspace. |
-| **Enterprise Data Streams** | 🟡 **SIMULATED** | Simulated incident notes, Slack transcript feeds, telemetry metrics, Vault key rotation. |
+| **Synthetic Enterprise Fixtures** | 🟢 **SYNTHETIC FIXTURE** | Synthetic JSON fixtures loaded from `data/` into SQLite tables. |
 | **Live Vault KMS / Slack API** | ⚪ **PLANNED** | Production OAuth2 webhook listeners and Vault API adapters. |
 
 ---

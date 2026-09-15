@@ -5,6 +5,11 @@ __pycache__/
 .pytest_cache/
 *.log
 
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Environments
 .env
 venv/
