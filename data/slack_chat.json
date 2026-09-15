@@ -1,0 +1,46 @@
+[
+  {
+    "id": "CHAT-8801",
+    "timestamp": "2026-09-03T07:05:12Z",
+    "channel": "#incident-identity-core",
+    "sender": "Marcus Vance",
+    "sender_role": "SRE Lead",
+    "text": "@channel SEV-1 declared. Enterprise Auth Service error rate hit 18.4%. Downstream apps getting HTTP 401 on valid user tokens.",
+    "key_takeaway": "Incident declaration & initial error spike",
+    "tags": ["SEV-1", "ALERT"],
+    "freshness": "FRESH"
+  },
+  {
+    "id": "CHAT-8804",
+    "timestamp": "2026-09-03T07:18:45Z",
+    "channel": "#incident-identity-core",
+    "sender": "Devon Zhao",
+    "sender_role": "Security Infra Engineer",
+    "text": "Vault auto-rotated identity token signing key `id-jwt-sig-key` from v3.9 -> v4.1 at 07:00:00Z. Rotation status marked SUCCESS in Vault.",
+    "key_takeaway": "Vault key rotation completed at 07:00 UTC",
+    "tags": ["VAULT", "KEY_ROTATION"],
+    "freshness": "FRESH"
+  },
+  {
+    "id": "CHAT-8812",
+    "timestamp": "2026-09-03T07:42:10Z",
+    "channel": "#incident-identity-core",
+    "sender": "Priya Patel",
+    "sender_role": "Gateway SRE",
+    "text": "Wait, API Edge Gateways cache the JWKS public key set for 4 hours. The edge nodes didn't receive the webhook cache invalidation trigger because edge webhook listener timed out!",
+    "key_takeaway": "Edge Gateway JWKS cache invalidation webhook failure identified",
+    "tags": ["GATEWAY", "JWKS_CACHE", "ROOT_CAUSE_LEAD"],
+    "freshness": "FRESH"
+  },
+  {
+    "id": "CHAT-8820",
+    "timestamp": "2026-09-03T08:15:30Z",
+    "channel": "#incident-identity-core",
+    "sender": "Elena Rostova",
+    "sender_role": "Shift Beta Lead",
+    "text": "Joining early for handover sync. @Marcus Vance if we force a JWKS key set reload on all 120 edge gateways via CLI `pubsub-flush`, that should fix the verification failures without rolling back Vault keys.",
+    "key_takeaway": "Proposed action: Force API Gateway JWKS cache invalidation",
+    "tags": ["HANDOVER_PREP", "PROPOSED_ACTION"],
+    "freshness": "FRESH"
+  }
+]

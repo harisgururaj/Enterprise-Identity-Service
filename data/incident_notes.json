@@ -1,0 +1,24 @@
+[
+  {
+    "id": "NOTE-INC-9042-01",
+    "timestamp": "2026-09-03T07:15:00Z",
+    "author": "Marcus Vance (Shift Lead Alpha)",
+    "severity": "SEV-1",
+    "summary": "OAuth2 Token Generation 500 Spike & Verification Failures across Enterprise Apps",
+    "tags": ["AUTH", "KEY_ROTATION", "REDIS_LEAK", "SEV-1"],
+    "content": "At 07:10 UTC, automated alerting reported a severe spike in OAuth2 token verification failures (401/500 errors) across enterprise downstream applications (HR Portal, Payment Gateway, Developer Platform). Initial triage indicated a Vault key rotation to signing key v4.1 at 07:00 UTC. SRE team attempted rate limit adjustments and Redis session pool flushes. Handover required due to shift transition at 09:30 UTC.",
+    "impacted_apps_count": 480,
+    "freshness": "FRESH"
+  },
+  {
+    "id": "NOTE-INC-9042-02",
+    "timestamp": "2026-09-03T08:45:00Z",
+    "author": "Elena Rostova (Shift Lead Beta - Incoming)",
+    "severity": "SEV-1",
+    "summary": "Pre-Handover Diagnostics & Contradictory Metric Signals",
+    "tags": ["DIAGNOSTICS", "CACHE_MISMATCH", "HANDOVER_PREP"],
+    "content": "Inspected API Gateway logs. Token issuance by Identity Core pod cluster is succeeding (200 OK), but API Edge Gateways are rejecting 42% of JWT tokens. Hypothesis H1 (Vault rotation) supported by Gateway key cache TTL (4h). Hypothesis H2 (Redis memory pressure) refutes direct causation due to pool memory remaining under 45% threshold.",
+    "impacted_apps_count": 480,
+    "freshness": "FRESH"
+  }
+]

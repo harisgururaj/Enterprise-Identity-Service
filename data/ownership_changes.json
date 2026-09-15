@@ -1,0 +1,14 @@
+[
+  {
+    "id": "OWN-4091",
+    "timestamp": "2026-09-03T09:30:00Z",
+    "previous_lead": "Marcus Vance (Shift Alpha)",
+    "new_lead": "Elena Rostova (Shift Beta)",
+    "outgoing_shift": "Alpha Shift (01:00-09:30 UTC)",
+    "incoming_shift": "Beta Shift (09:30-18:00 UTC)",
+    "team": "Identity & Access SRE Team",
+    "handover_type": "ROUTINE",
+    "notes": "Formal shift rotation handover during ongoing SEV-1 incident. Structured Handover Workspace active.",
+    "freshness": "FRESH"
+  }
+]
