@@ -113,12 +113,29 @@ class HeaderAuthProvider(AuthProviderInterface):
         return AuthUserIdentity(username=x_user_name.strip(), role=x_user_role.strip())
 
 
-auth_provider: AuthProviderInterface = HeaderAuthProvider()
+class OIDCAuthProvider(AuthProviderInterface):
+    """
+    Production Enterprise OIDC / OAuth2 Provider boundary.
+    Requires live IdP configuration (Okta, Azure AD, Keycloak) when AUTH_PROVIDER=oidc.
+    """
+    def get_authenticated_user(self, request: Request) -> AuthUserIdentity:
+        raise HTTPException(
+            status_code=501,
+            detail="Not Implemented: Production Enterprise OIDC/OAuth2 authentication provider requires live IdP configuration (Okta / Azure AD / Keycloak). Set AUTH_PROVIDER=header for prototype demo mode."
+        )
+
+
+auth_provider_mode = os.getenv("AUTH_PROVIDER", "header").strip().lower()
+if auth_provider_mode == "oidc":
+    auth_provider: AuthProviderInterface = OIDCAuthProvider()
+else:
+    auth_provider: AuthProviderInterface = HeaderAuthProvider()
 
 
 def get_authenticated_user(request: Request) -> AuthUserIdentity:
     """FastAPI dependency wrapper for the active AuthProvider."""
     return auth_provider.get_authenticated_user(request)
+
 
 
 def require_role(allowed_roles: List[str]):
