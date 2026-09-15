@@ -31,11 +31,11 @@ The **Enterprise Identity Service Shift-Handover Workspace** is constructed usin
 
 - **`backend/app.py`**: FastAPI routing, RBAC enforcement (`get_authenticated_user`, `require_role`), 2-person approval workflow, generic state snapshot restoration, SHA-256 hash chaining, handover signoff validation, and CORS security.
 - **`backend/models.py`**: Pydantic data schemas (`AuthUserIdentity`, `FreshnessState`, `ActionStatus`, `AuditEntry`, `StateSnapshot`, `BenchmarkResult`, `ResilienceExperimentSummary`).
-- **`backend/benchmark.py`**: Monte Carlo simulation engine (`run_handover_benchmark`, `run_resilience_experiment`) computing delay reductions, 95% confidence intervals, and degradation matrix across 4 availability conditions.
+- **`backend/benchmark.py`**: Monte Carlo simulation engine (`run_handover_benchmark`, `run_resilience_experiment`) computing delay reductions, 95% confidence intervals, and degradation matrix across 8 availability conditions.
 - **`backend/data_generator.py`**: Incident SEV-1 scenario generator initializing raw streams, hypotheses, state snapshots, and resilience items.
 - **`frontend/index.html` & `frontend/css/style.css`**: Responsive operational dashboard featuring glassmorphism cards, dynamic role badges, action controls, and modal drill-downs.
 - **`frontend/js/app.js`**: Client controller handling header injection, state toggles, audit tamper verification, and validation mode switching.
-- **`tests/test_backend.py`**: Pytest integration suite (12/12 passing) covering security, RBAC, impersonation prevention, state rollbacks, audit tamper detection, and benchmark reproducibility.
+- **`tests/`**: Pytest automated test suite (21 PASSED / 3 XFAIL Playwright browser E2E tests across 24 collected items) covering security, RBAC, impersonation prevention, state rollbacks, audit tamper detection, SQLite engine restart persistence, and benchmark reproducibility.
 
 ---
 

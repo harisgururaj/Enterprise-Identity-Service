@@ -2,10 +2,10 @@
 
 ## Pre-Deployment Verification
 - [x] Python 3.10+ runtime verified.
-- [x] Complete dependencies listed in `requirements.txt` (FastAPI, SQLAlchemy, Pydantic, Pytest, Uvicorn, Httpx).
+- [x] Complete dependencies listed in `requirements.txt` (FastAPI, SQLAlchemy, Pydantic, Pytest, Uvicorn, Httpx, Playwright).
 - [x] SQLite database schema initialized (`identity_workspace.db`).
 - [x] Database health and readiness endpoints operational (`GET /health`, `GET /health/ready`).
-- [x] Automated test suite execution: `python -m pytest tests/test_backend.py -v` (19/19 PASSED).
+- [x] Automated test suite execution: `python -m pytest tests/ -v` (21 PASSED / 3 XFAIL across 24 collected items).
 
 ## Deployment Procedure
 1. **Navigate to Project Directory**:
@@ -18,7 +18,7 @@
    ```
 3. **Execute Test Suite**:
    ```powershell
-   python -m pytest tests/test_backend.py -v
+   python -m pytest tests/ -v
    ```
 4. **Launch Application**:
    ```powershell

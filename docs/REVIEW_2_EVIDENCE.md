@@ -37,10 +37,10 @@ This document presents empirical evidence and verification results for the **Ent
 ---
 
 ## 5. End-to-End (E2E) Browser Testing
-- **Status**: **`VERIFIED`**
+- **Status**: **`IMPLEMENTED (XFAIL - Browser Binary Pending)`**
 - **Evidence**: Playwright browser test suite implemented in `tests/e2e/test_frontend_e2e.py` covering E2E-01 (SRE workflow), E2E-02 (Incident Commander workflow), and E2E-03 (Stakeholder restricted workflow).
 - **Test**: `tests/e2e/test_frontend_e2e.py`
-- **Result**: **`VERIFIED`** (Playwright browser automation test suite ready for local server execution).
+- **Result**: **`XFAIL`** (E2E browser tests implemented; marked XFAIL pending Playwright Chromium browser binary download in local environment via `python -m playwright install chromium`).
 
 ---
 
@@ -81,9 +81,9 @@ This document presents empirical evidence and verification results for the **Ent
 ## 10. Git Commit History
 - **Status**: **`VERIFIED`**
 - **Commit History**:
+  - `4a7bf72` — *docs: add Review 2 evidence summary, screenshot checklist, validation runbook, and updated requirement matrix*
+  - `04d82f6` — *feat(testing): add Playwright E2E browser tests, persistence restart suite, audit tamper test, and OIDC auth provider boundary*
   - `c282f76` — *feat: integrate SQLite DB persistence, health endpoints, AuthProvider abstraction, fixture ingestion, and 19/19 pytest suite*
-  - `802392c` — *feat(database): implement SQLite persistence layer with SQLAlchemy and durable SHA-256 audit table*
-  - `4a0ae62` — *feat(fixtures): add 5 realistic synthetic enterprise JSON fixtures in data/*
 
 ---
 
