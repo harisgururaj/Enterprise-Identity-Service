@@ -35,7 +35,7 @@ The **Enterprise Identity Service Shift-Handover Workspace** is constructed usin
 - **`backend/data_generator.py`**: Incident SEV-1 scenario generator initializing raw streams, hypotheses, state snapshots, and resilience items.
 - **`frontend/index.html` & `frontend/css/style.css`**: Responsive operational dashboard featuring glassmorphism cards, dynamic role badges, action controls, and modal drill-downs.
 - **`frontend/js/app.js`**: Client controller handling header injection, state toggles, audit tamper verification, and validation mode switching.
-- **`tests/`**: Pytest automated test suite (21 PASSED / 3 XFAIL Playwright browser E2E tests across 24 collected items) covering security, RBAC, impersonation prevention, state rollbacks, audit tamper detection, SQLite engine restart persistence, and benchmark reproducibility.
+- **`tests/`**: Pytest automated test suite (24/24 PASSED: 19 backend unit/integration + 1 persistence restart + 1 audit tamper + 3 Playwright browser E2E tests) covering security, RBAC, impersonation prevention, state rollbacks, audit tamper detection, SQLite engine restart persistence, and benchmark reproducibility.
 
 ---
 
