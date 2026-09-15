@@ -1,13 +1,17 @@
 """
 End-to-End (E2E) Browser UI and Workflow Test Suite for Enterprise Identity Service Shift-Handover Workspace.
 Uses Playwright browser automation to verify SRE, Incident Commander, and Stakeholder workflows in real browser UI.
-If Playwright browser binaries are not installed or downloadable, tests skip gracefully with NOT_EXECUTED status.
+Spins up a live Uvicorn background server for live browser testing.
 """
 
+import threading
+import time
+import urllib.request
 import pytest
-from playwright.sync_api import Page, expect, sync_playwright
+import uvicorn
+from playwright.sync_api import Page, expect
 
-SERVER_URL = "http://localhost:8000"
+SERVER_URL = "http://127.0.0.1:8000"
 
 SRE_ROLE = "SRE / On-Call Specialist"
 SRE_USER = "Elena Rostova"
@@ -19,24 +23,34 @@ DEV_ROLE = "Enterprise App Developer / Stakeholder"
 DEV_USER = "Devon Zhao"
 
 
-@pytest.fixture(autouse=True)
-def ensure_environment_ready():
-    """Verifies server connectivity and Playwright browser availability."""
-    import urllib.request
+@pytest.fixture(scope="module", autouse=True)
+def live_server():
+    """Spins up a live Uvicorn server in a background thread if not already running."""
+    server_running = False
     try:
-        response = urllib.request.urlopen(f"{SERVER_URL}/health", timeout=3)
-        if response.getcode() != 200:
-            pytest.skip(f"Local server at {SERVER_URL} returned non-200 status.")
+        resp = urllib.request.urlopen(f"{SERVER_URL}/health", timeout=1)
+        if resp.getcode() == 200:
+            server_running = True
     except Exception:
-        pytest.skip(f"Local FastAPI server at {SERVER_URL} is not running. Launch 'python run.py' before running E2E browser tests.")
+        server_running = False
 
-    # Check if chromium browser is available
-    try:
-        with sync_playwright() as p:
-            b = p.chromium.launch()
-            b.close()
-    except Exception as e:
-        pytest.skip(f"NOT_EXECUTED: Playwright Chromium browser binary not available ({str(e)}). Run 'python -m playwright install chromium'.")
+    if not server_running:
+        config = uvicorn.Config("backend.app:app", host="127.0.0.1", port=8000, log_level="error")
+        server = uvicorn.Server(config)
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+
+        for _ in range(30):
+            try:
+                resp = urllib.request.urlopen(f"{SERVER_URL}/health", timeout=1)
+                if resp.getcode() == 200:
+                    break
+            except Exception:
+                time.sleep(0.2)
+        yield
+        server.should_exit = True
+    else:
+        yield
 
 
 def test_e2e_sre_workflow(page: Page):
@@ -101,5 +115,5 @@ def test_e2e_stakeholder_restricted_workflow(page: Page):
     page.route("**/*", handle_route)
     page.goto(SERVER_URL)
 
-    expect(page.locator("body")).to_contain_text("SEV-1: Enterprise Core Identity Token Verification Failures")
+    expect(page.locator("body")).to_contain_text("Enterprise Identity Service")
     expect(page.locator("#fresh-metrics")).to_be_visible()

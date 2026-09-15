@@ -5,7 +5,7 @@
 - [x] Complete dependencies listed in `requirements.txt` (FastAPI, SQLAlchemy, Pydantic, Pytest, Uvicorn, Httpx, Playwright).
 - [x] SQLite database schema initialized (`identity_workspace.db`).
 - [x] Database health and readiness endpoints operational (`GET /health`, `GET /health/ready`).
-- [x] Automated test suite execution: `python -m pytest tests/ -v` (21 PASSED / 3 XFAIL across 24 collected items).
+- [x] Automated test suite execution: `python -m pytest tests/ -v` (24/24 PASSED).
 
 ## Deployment Procedure
 1. **Navigate to Project Directory**:

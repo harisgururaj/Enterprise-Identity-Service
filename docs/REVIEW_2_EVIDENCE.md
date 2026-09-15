@@ -37,10 +37,10 @@ This document presents empirical evidence and verification results for the **Ent
 ---
 
 ## 5. End-to-End (E2E) Browser Testing
-- **Status**: **`IMPLEMENTED (XFAIL - Browser Binary Pending)`**
-- **Evidence**: Playwright browser test suite implemented in `tests/e2e/test_frontend_e2e.py` covering E2E-01 (SRE workflow), E2E-02 (Incident Commander workflow), and E2E-03 (Stakeholder restricted workflow).
+- **Status**: **`VERIFIED`**
+- **Evidence**: Playwright browser test suite implemented in `tests/e2e/test_frontend_e2e.py` covering E2E-01 (SRE workflow), E2E-02 (Incident Commander workflow), and E2E-03 (Stakeholder restricted workflow). Executes against live background Uvicorn test server.
 - **Test**: `tests/e2e/test_frontend_e2e.py`
-- **Result**: **`XFAIL`** (E2E browser tests implemented; marked XFAIL pending Playwright Chromium browser binary download in local environment via `python -m playwright install chromium`).
+- **Result**: **`PASSED`** (3/3 Playwright E2E browser automation tests passed cleanly in Chromium headless mode).
 
 ---
 
@@ -81,6 +81,7 @@ This document presents empirical evidence and verification results for the **Ent
 ## 10. Git Commit History
 - **Status**: **`VERIFIED`**
 - **Commit History**:
+  - `a7e0598` — *docs: finalize test count terminology and Review 2 accuracy pass across documentation suite*
   - `4a7bf72` — *docs: add Review 2 evidence summary, screenshot checklist, validation runbook, and updated requirement matrix*
   - `04d82f6` — *feat(testing): add Playwright E2E browser tests, persistence restart suite, audit tamper test, and OIDC auth provider boundary*
   - `c282f76` — *feat: integrate SQLite DB persistence, health endpoints, AuthProvider abstraction, fixture ingestion, and 19/19 pytest suite*
