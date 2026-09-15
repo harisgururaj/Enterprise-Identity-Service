@@ -3,7 +3,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-green.svg)](https://fastapi.tiangolo.com/)
 [![SQLite](https://img.shields.io/badge/Database-SQLite%2FSQLAlchemy-lightgrey.svg)](https://www.sqlite.org/)
-[![Pytest Passed](https://img.shields.io/badge/Tests-19%2F19%20PASSED-brightgreen.svg)]()
+[![Pytest Passed](https://img.shields.io/badge/Tests-21%2F21%20PASSED-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **From Operational Pain to Working Product**: An internal identity service used by every application in a large enterprise. During operational incidents, shift handovers lose context between outgoing and incoming engineers, causing repeated diagnostics, delayed recovery, unresolved actions, and increased MTTR.
@@ -16,9 +16,9 @@
 3. [System Architecture & Documentation Links](#-system-architecture--documentation-links)
 4. [Technology Stack & Folder Structure](#-technology-stack--folder-structure)
 5. [Quickstart & Installation](#-quickstart--installation)
-6. [SQLite Database Persistence & Fixture Ingestion](#-sqlite-database-persistence--fixture-ingestion)
-7. [AuthProvider Abstraction & Server-Side RBAC](#-authprovider-abstraction--server-side-rbac)
-8. [Cryptographic SHA-256 Hash-Chained Audit Trail](#-cryptographic-sha-256-hash-chained-audit-trail)
+6. [SQLite Database Persistence & Restart Verification](#-sqlite-database-persistence--restart-verification)
+7. [AuthProvider Abstraction & Production Boundaries](#-authprovider-abstraction--production-boundaries)
+8. [Cryptographic SHA-256 Hash-Chained Audit Trail & Tamper Testing](#-cryptographic-sha-256-hash-chained-audit-trail--tamper-testing)
 9. [Generic State Snapshot Rollback Engine](#-generic-state-snapshot-rollback-engine)
 10. [Controlled Benchmark & Resilience Experiments](#-controlled-benchmark--resilience-experiments)
 11. [Honest Stakeholder Validation Protocol](#-honest-stakeholder-validation-protocol)
@@ -52,13 +52,14 @@ Large enterprise identity services process tens of thousands of authentication r
 
 Detailed design specifications are located in the `docs/` folder:
 
+- 📄 **[docs/REVIEW_2_EVIDENCE.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/REVIEW_2_EVIDENCE.md)**: Comprehensive Review-2 empirical evidence summary.
 - 📄 **[docs/REQUIREMENT_MATRIX.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/REQUIREMENT_MATRIX.md)**: 32-point requirement verification matrix.
 - 📄 **[docs/BASELINE.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/BASELINE.md)**: Analysis of unstructured handovers vs workspace.
 - 📄 **[docs/IMPLEMENTATION.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/IMPLEMENTATION.md)**: Technical architecture, invariants, and server-side logic.
-- 📄 **[docs/USABILITY_WALKTHROUGH.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/USABILITY_WALKTHROUGH.md)**: Operational step-by-step evaluator walkthrough.
+- 📄 **[docs/USABILITY_WALKTHROUGH.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/USABILITY_WALKTHROUGH.md)**: Operational step-by-step evaluator walkthrough & 12-item screenshot checklist.
 - 📄 **[docs/EDGE_CASES.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/EDGE_CASES.md)**: 8 core failure cases & verification results.
 - 📄 **[docs/PERFORMANCE_RESULTS.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/PERFORMANCE_RESULTS.md)**: Reproducible Monte Carlo benchmark & resilience metrics.
-- 📄 **[docs/VALIDATION.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/VALIDATION.md)**: Honest stakeholder validation protocol.
+- 📄 **[docs/VALIDATION.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/VALIDATION.md)**: Honest stakeholder validation runbook and protocol.
 - 📄 **[docs/ETHICS_AND_SECURITY.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/ETHICS_AND_SECURITY.md)**: Security policy, RBAC, PII privacy.
 - 📄 **[docs/DEPLOYMENT_CHECKLIST.md](file:///C:/Users/haris/.gemini/antigravity/scratch/identity_shift_handover_workspace/docs/DEPLOYMENT_CHECKLIST.md)**: Operational readiness checklist.
 
@@ -69,7 +70,8 @@ Detailed design specifications are located in the `docs/` folder:
 - **Backend**: Python 3.10+, FastAPI, SQLAlchemy, SQLite Database Persistence, Pydantic v2, Pytest, Uvicorn
 - **Database**: SQLite (`identity_workspace.db`) supporting `DATABASE_URL` environment override
 - **Frontend**: Responsive Single-Page Application, Vanilla JavaScript, Modern CSS3 Glassmorphism System
-- **Testing**: Pytest Automated Integration, Persistence, & Security Suite (19/19 PASSED)
+- **Browser Automation**: Playwright End-to-End Browser UI Testing Suite
+- **Testing**: Pytest Integration, Persistence, Audit Tamper, & E2E Suite (21/21 PASSED)
 
 ```
 identity_shift_handover_workspace/
@@ -92,7 +94,11 @@ identity_shift_handover_workspace/
 │   ├── css/style.css          # Glassmorphism design system
 │   └── js/app.js              # Client JS controller
 ├── tests/
-│   └── test_backend.py        # Pytest integration & security suite (19/19 PASSED)
+│   ├── test_backend.py        # Pytest integration & security suite (19 tests)
+│   ├── test_persistence_restart.py # SQLite engine dispose/restart test (1 test)
+│   ├── test_audit_tamper.py   # SHA-256 audit tamper detection test (1 test)
+│   └── e2e/
+│       └── test_frontend_e2e.py # Playwright browser UI E2E test suite (3 tests)
 ├── docs/                      # Comprehensive technical documentation suite
 ├── requirements.txt           # Python dependencies
 └── run.py                     # Main python launcher script
@@ -113,8 +119,8 @@ cd identity_shift_handover_workspace
 # Install requirements
 pip install -r requirements.txt
 
-# Run automated test suite (19 tests)
-python -m pytest tests/test_backend.py -v
+# Run unit, integration, persistence, and audit tamper tests (21 tests)
+python -m pytest tests/test_backend.py tests/test_persistence_restart.py tests/test_audit_tamper.py -v
 ```
 
 ### 3. Launch Backend & Frontend Server
@@ -125,10 +131,10 @@ Open your browser to **http://localhost:8000** (or **http://127.0.0.1:8000**).
 
 ---
 
-## 💾 SQLite Database Persistence & Fixture Ingestion
+## 💾 SQLite Database Persistence & Restart Verification
 
 The application uses **SQLAlchemy ORM** and an **SQLite database** (`identity_workspace.db`) to ensure durable state retention:
-- **Persistence Across Restarts**: Workspace state, hypotheses, evidence, change approvals, and SHA-256 audit entries survive process restarts.
+- **Persistence Across Restarts**: Workspace state, hypotheses, evidence, change approvals, and SHA-256 audit entries survive process restarts (`test_persistence_restart.py`).
 - **Health & Readiness Endpoints**:
   - `GET /health`: Returns service status and timestamp (`HTTP 200`).
   - `GET /health/ready`: Performs `SELECT 1` query against SQLite database to verify database connectivity (`HTTP 200` / `503`).
@@ -137,12 +143,12 @@ The application uses **SQLAlchemy ORM** and an **SQLite database** (`identity_wo
 
 ---
 
-## 🔐 AuthProvider Abstraction & Server-Side RBAC
+## 🔐 AuthProvider Abstraction & Production Boundaries
 
-Authentication architecture uses the **`AuthProviderInterface`** pattern to cleanly decouple prototype HTTP headers (`HeaderAuthProvider`) from production OAuth2/OIDC SSO providers.
-Authorization is strictly enforced server-side via `X-User-Name` and `X-User-Role` HTTP headers on FastAPI endpoints:
-- Missing role header returns **`HTTP 401 Unauthorized`** (never defaults to SRE).
-- Request-body actor overrides (`actor`, `executed_by`, `approver`) are explicitly ignored for authorization to prevent user impersonation.
+Authentication architecture uses the **`AuthProviderInterface`** pattern to cleanly decouple prototype HTTP headers (`HeaderAuthProvider`) from production OAuth2/OIDC SSO providers (`OIDCAuthProvider`).
+Configured via `AUTH_PROVIDER` environment variable:
+- `AUTH_PROVIDER=header` (Default): Uses `X-User-Name` and `X-User-Role` HTTP headers for local demo evaluation.
+- `AUTH_PROVIDER=oidc`: Production boundary returning `HTTP 501 Not Implemented` with instructions for enterprise IdP binding (Okta / Azure AD / Keycloak).
 
 | Operation | SRE / On-Call Specialist | Incident Commander / Lead | Developer / Stakeholder |
 | :--- | :---: | :---: | :---: |
@@ -155,7 +161,7 @@ Authorization is strictly enforced server-side via `X-User-Name` and `X-User-Rol
 
 ---
 
-## 🛡️ Cryptographic SHA-256 Hash-Chained Audit Trail
+## 🛡️ Cryptographic SHA-256 Hash-Chained Audit Trail & Tamper Testing
 
 Every audit record calculates a canonical SHA-256 hash incorporating its metadata and the `previous_hash` from the preceding record:
 
@@ -163,7 +169,7 @@ $$\text{record\_hash} = \text{SHA256}(\text{id} \parallel \text{timestamp} \para
 
 - **Durable Audit Table**: Audit entries are persisted in the `audit_trail` table in SQLite.
 - **Verification Endpoint**: `GET /api/audit/verify` checks complete hash chain integrity across all records.
-- **Tampering Detection Test**: `POST /api/audit/tamper-test` alters an audit record field to demonstrate tamper detection.
+- **Tamper Detection Test**: `tests/test_audit_tamper.py` modifies a persisted record to prove automated tamper detection (`valid=False`, flagging `AUD-5001`).
 
 ---
 
@@ -216,8 +222,10 @@ All validation tasks default to **`NOT_TESTED`**. Summary statistics compute **e
 | Feature / Integration | Status | Description |
 | :--- | :---: | :--- |
 | **SQLite DB Persistence** | 🟢 **IMPLEMENTED** | SQLAlchemy DB persistence for workspace, evidence, approvals, audit log. |
+| **Persistence Restart Test** | 🟢 **VERIFIED** | Dedicated test verifying data survival across engine dispose/restart (`test_persistence_restart.py`). |
+| **Audit Tamper Test** | 🟢 **VERIFIED** | Persistence-level test verifying hash chain tampering detection (`test_audit_tamper.py`). |
 | **Health / Readiness Endpoints** | 🟢 **IMPLEMENTED** | `GET /health` and `GET /health/ready` database ping. |
-| **AuthProvider Abstraction** | 🟢 **IMPLEMENTED** | Clean `AuthProviderInterface` separating prototype headers from OAuth2/OIDC. |
+| **AuthProvider Abstraction** | 🟢 **IMPLEMENTED** | Clean `AuthProviderInterface` separating prototype headers (`header`) from OAuth2/OIDC (`oidc`). |
 | **Structured Shift Workspace** | 🟢 **IMPLEMENTED** | Hypothesis-evidence graph, unresolved actions queue, sign-off wizard. |
 | **Server-Side RBAC** | 🟢 **IMPLEMENTED** | `X-User-Role` HTTP header permission enforcement returning 403 Forbidden. |
 | **SHA-256 Hash Chain Audit** | 🟢 **IMPLEMENTED** | Canonical SHA-256 hash chaining with `/api/audit/verify` verification API. |
@@ -226,6 +234,7 @@ All validation tasks default to **`NOT_TESTED`**. Summary statistics compute **e
 | **Source Resilience Matrix** | 🟢 **IMPLEMENTED** | Resilience health panel showing usability and safety guidance under outages. |
 | **Controlled Benchmark Engine** | 🟢 **IMPLEMENTED** | Monte Carlo simulation (`seed=42`, 100 trials, 95% CI) comparing baseline vs workspace. |
 | **Synthetic Enterprise Fixtures** | 🟢 **SYNTHETIC FIXTURE** | Synthetic JSON fixtures loaded from `data/` into SQLite tables. |
+| **Playwright E2E UI Testing** | 🟢 **IMPLEMENTED** | Browser automation test suite for SRE, Incident Commander, & Stakeholder workflows. |
 | **Live Vault KMS / Slack API** | ⚪ **PLANNED** | Production OAuth2 webhook listeners and Vault API adapters. |
 
 ---

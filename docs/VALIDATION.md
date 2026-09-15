@@ -1,11 +1,13 @@
-# Stakeholder Validation Framework & Record Protocol
+# Stakeholder Validation Framework & Operational Runbook
 
 ## 1. User Research Honesty Policy
 
-To maintain evaluation integrity, the **Enterprise Identity Service Shift-Handover Workspace** distinguishes between seeded sample tasks and genuine user research observations.
+To maintain evaluation integrity, the **Enterprise Identity Service Shift-Handover Workspace** strictly distinguishes between seeded sample tasks and genuine user research observations.
 
 > [!CAUTION]
-> Pre-populated test results can distort evaluation integrity. In this repository, all stakeholder validation tasks default to **`NOT_TESTED`**. Summary statistics are computed **exclusively** from recorded **`OBSERVED_VALIDATION`** entries.
+> Pre-populated test results distort evaluation integrity. In this repository, all stakeholder validation tasks default to **`NOT_TESTED`**. Summary statistics are computed **exclusively** from recorded **`OBSERVED_VALIDATION`** entries.
+> 
+> Current Status: **`NOT_TESTED` (Real observation pending)**
 
 ---
 
@@ -13,42 +15,81 @@ To maintain evaluation integrity, the **Enterprise Identity Service Shift-Handov
 
 | Status Label | Description | Calculation Inclusion |
 | :--- | :--- | :--- |
-| **`NOT_TESTED`** | Task initialized in workspace, awaiting user observation. | Excluded from completion rate |
+| **`NOT_TESTED`** | Task initialized in workspace, awaiting real user observation. | Excluded from completion rate |
 | **`DEMO_SAMPLE`** | Sample dataset for UI demonstration purposes. | Excluded from completion rate |
 | **`OBSERVED_VALIDATION`** | Recorded user observation submitted via API (`POST /api/stakeholder-validation`). | **Included** in completion rate |
 
 ---
 
-## 3. Evaluation Tasks Protocol
+## 3. Role-Specific Evaluation Protocol (Validation Runbook)
 
-The validation workflow exposes 8 standard operational tasks for on-call engineers, incident commanders, and stakeholders:
+### Session A: SRE / On-Call Specialist Session
+**Target Role**: SRE / On-Call Specialist  
+**Headers Required**: `X-User-Role: SRE / On-Call Specialist`, `X-User-Name: <Participant Name>`  
+**Operational Tasks**:
+1. Open active SEV-1 incident workspace (`INC-9042`).
+2. Inspect the 5 enterprise source freshness statuses (`fresh-notes`, `fresh-chat`, `fresh-metrics`, `fresh-ownership`, `fresh-actions`).
+3. Identify degraded or missing source indicators (e.g., Slack Chat stream MISSING state).
+4. Inspect active hypotheses in the evidence graph (`HYPO-01`).
+5. Inspect supporting evidence snippets (`EVID-01`, `EVID-02`).
+6. Create or update an operational hypothesis via the workspace UI.
+7. Review unresolved high-impact action queue (`ACT-1003`).
+8. Execute an approved action after dual approval is granted.
+9. Verify SHA-256 audit record appended for executed action.
+10. Perform 1-click state snapshot rollback and verify physical metric restoration.
 
-1. **TASK-01**: Find current incident owner and incoming shift owner.
-2. **TASK-02**: Identify highest-confidence hypothesis in evidence graph.
-3. **TASK-03**: Determine whether telemetry source stream is fresh or degraded.
-4. **TASK-04**: Locate unresolved high-impact operational actions.
-5. **TASK-05**: Determine dual approval history and approver identities.
-6. **TASK-06**: Execute action rollback demonstration if authorized.
-7. **TASK-07**: Verify audit trail hash chain integrity and tamper detection.
-8. **TASK-08**: Complete shift handover sign-off workflow.
+### Session B: Incident Commander / Handover Lead Session
+**Target Role**: Incident Commander / Handover Lead  
+**Headers Required**: `X-User-Role: Incident Commander / Handover Lead`, `X-User-Name: <Participant Name>`  
+**Operational Tasks**:
+1. Review overall incident summary and context loss risk score.
+2. Review evidence-backed hypotheses and confidence scores.
+3. Review source resilience matrix usability guidance.
+4. Review pending change review requests (`ACT-1003`).
+5. Provide Approval 2 for change review request.
+6. Complete formal shift handover sign-off wizard (`outgoing_user` vs `incoming_user`).
+
+### Session C: Enterprise App Developer / Stakeholder Session
+**Target Role**: Enterprise App Developer / Stakeholder  
+**Headers Required**: `X-User-Role: Enterprise App Developer / Stakeholder`, `X-User-Name: <Participant Name>`  
+**Operational Tasks**:
+1. View incident context and impact summary across 480+ downstream applications.
+2. View permitted evidence snippets.
+3. Inspect data source freshness indicators.
+4. Verify restricted mutation controls (execution, rollback, approval) return `HTTP 403 Forbidden` or are hidden.
+5. Confirm handover lead contact details and shift transition state.
 
 ---
 
 ## 4. Recording Real Observations
 
-Real observations are recorded via frontend or API call:
+Participant observations must be recorded using the API endpoint or UI form:
 
 ```bash
 curl -X POST http://localhost:8000/api/stakeholder-validation \
   -H "Content-Type: application/json" \
-  -H "X-User-Role: Enterprise App Developer / Stakeholder" \
-  -H "X-User-Name: Devon Zhao" \
+  -H "X-User-Role: SRE / On-Call Specialist" \
+  -H "X-User-Name: Elena Rostova" \
   -d '{
     "task_id": "TASK-01",
     "completed": true,
-    "completion_time_sec": 14.2,
+    "completion_time_sec": 14.5,
     "error_count": 0,
-    "comments": "User easily found incoming owner Elena Rostova in summary card.",
+    "comments": "Participant located incoming shift lead in summary card in 14.5s.",
     "validation_status": "OBSERVED_VALIDATION"
   }'
 ```
+
+---
+
+## 5. Session Observation Sheet
+
+For every live evaluation session, record:
+- **Participant Role**: `SRE` / `Incident Commander` / `Developer`
+- **Participant Identifier**: `<Name / Pseudonym>`
+- **Task ID**: `TASK-01` through `TASK-08`
+- **Start Time & End Time**: ISO UTC timestamp
+- **Duration**: Elapsed time in seconds
+- **Success/Failure**: `True` / `False`
+- **Error Count**: Number of misplaced clicks or unfulfilled sub-steps
+- **Qualitative Feedback**: Participant observations or notes
